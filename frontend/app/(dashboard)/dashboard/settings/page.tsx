@@ -47,6 +47,7 @@ export default function SettingsPage() {
   // ── Grade Weight State ──
   const [reportPercentage, setReportPercentage] = useState<number>(60);
   const [examPercentage, setExamPercentage] = useState<number>(40);
+  const [activeSemesters, setActiveSemesters] = useState<string[]>(['7', '8', '9', '10', '11']);
   const [weightError, setWeightError] = useState<string | null>(null);
   const [weightSuccess, setWeightSuccess] = useState(false);
 
@@ -86,6 +87,9 @@ export default function SettingsPage() {
     if (data?.weight) {
       setReportPercentage(data.weight.reportPercentage);
       setExamPercentage(data.weight.examPercentage);
+      if (data.weight.activeSemesters) {
+        setActiveSemesters(data.weight.activeSemesters.split(','));
+      }
     }
   }, [data]);
 
@@ -114,7 +118,11 @@ export default function SettingsPage() {
       setWeightError('Total pembobotan harus sama dengan 100%!');
       return;
     }
-    updateMutation.mutate({ reportPercentage, examPercentage });
+    if (activeSemesters.length === 0) {
+      setWeightError('Minimal pilih satu semester untuk perhitungan rapor!');
+      return;
+    }
+    updateMutation.mutate({ reportPercentage, examPercentage, activeSemesters });
   };
 
   // ── Backup Handlers ──
@@ -260,6 +268,39 @@ export default function SettingsPage() {
                   />
                   <span className="text-slate-500 text-xs font-medium">Bobot nilai ujian madrasah</span>
                 </div>
+              </div>
+            </div>
+
+            {/* Semester Selection */}
+            <div className="pt-4 border-t border-slate-800/60 mt-4">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">
+                Semester Rapor yang Dihitung
+              </label>
+              <div className="flex flex-wrap gap-4">
+                {[7, 8, 9, 10, 11, 12].map((sem) => (
+                  <label key={sem} className="flex items-center gap-2 cursor-pointer group">
+                    <div className="relative flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={activeSemesters.includes(String(sem))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setActiveSemesters((prev) => [...prev, String(sem)].sort((a, b) => Number(a) - Number(b)));
+                          } else {
+                            setActiveSemesters((prev) => prev.filter((s) => s !== String(sem)));
+                          }
+                        }}
+                        className="peer sr-only"
+                      />
+                      <div className="w-5 h-5 rounded border border-slate-700 bg-slate-900 peer-checked:bg-indigo-600 peer-checked:border-indigo-600 transition-colors flex items-center justify-center">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity" />
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-300 group-hover:text-slate-200 transition-colors">
+                      Semester {sem}
+                    </span>
+                  </label>
+                ))}
               </div>
             </div>
 

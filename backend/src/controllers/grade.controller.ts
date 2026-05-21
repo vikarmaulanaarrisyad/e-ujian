@@ -89,19 +89,21 @@ export const updateGradeWeight = async (req: Request, res: Response, next: NextF
       return res.status(404).json({ message: 'No active academic year found' });
     }
 
-    const { reportPercentage, examPercentage } = validation.data;
+    const { reportPercentage, examPercentage, activeSemesters } = validation.data;
+    const activeSemestersString = activeSemesters ? activeSemesters.join(',') : "7,8,9,10,11";
 
     let weight = activeYear.gradeWeights[0];
     if (weight) {
       weight = await prisma.gradeWeight.update({
         where: { id: weight.id },
-        data: { reportPercentage, examPercentage },
+        data: { reportPercentage, examPercentage, activeSemesters: activeSemestersString },
       });
     } else {
       weight = await prisma.gradeWeight.create({
         data: {
           reportPercentage,
           examPercentage,
+          activeSemesters: activeSemestersString,
           academicYearId: activeYear.id,
         },
       });
@@ -153,7 +155,7 @@ export const getReportGrades = async (req: Request, res: Response, next: NextFun
     });
 
     const data = students.map((student) => {
-      const grades: Record<number, number | null> = { 7: null, 8: null, 9: null, 10: null, 11: null };
+      const grades: Record<number, number | null> = { 7: null, 8: null, 9: null, 10: null, 11: null, 12: null };
       student.reportGrades.forEach((g) => {
         grades[g.semester] = g.score;
       });
@@ -272,7 +274,7 @@ export const exportReportGrades = async (req: Request, res: Response, next: Next
     if (targetSemester) {
       baseColumns.push({ key: `sem${targetSemester}`, width: 12 });
     } else {
-      for (let sem = 7; sem <= 11; sem++) {
+      for (let sem = 7; sem <= 12; sem++) {
         baseColumns.push({ key: `sem${sem}`, width: 12 });
       }
     }
@@ -295,7 +297,7 @@ export const exportReportGrades = async (req: Request, res: Response, next: Next
     if (targetSemester) {
       row1.getCell(4).value = `Smt ${targetSemester}`;
     } else {
-      for (let sem = 7; sem <= 11; sem++) {
+      for (let sem = 7; sem <= 12; sem++) {
         row1.getCell(4 + (sem - 7)).value = `Smt ${sem}`;
       }
     }
@@ -333,7 +335,7 @@ export const exportReportGrades = async (req: Request, res: Response, next: Next
         );
         rowData[`sem${targetSemester}`] = matchingGrade ? matchingGrade.score : '';
       } else {
-        for (let sem = 7; sem <= 11; sem++) {
+        for (let sem = 7; sem <= 12; sem++) {
           const matchingGrade = student.reportGrades.find(
             (rg) => rg.semester === sem
           );
@@ -413,13 +415,13 @@ export const importReportGrades = async (req: Request, res: Response, next: Next
     const gradesToUpsert: any[] = [];
     const errors: string[] = [];
 
-    const semesterMap: Record<number, number> = {}; // maps colIndex to semester (7-11)
+    const semesterMap: Record<number, number> = {}; // maps colIndex to semester (7-12)
     const headerRow = worksheet.getRow(1);
     
     for (let col = 4; col <= worksheet.columnCount; col++) {
       const val = getCellValueAsString(headerRow.getCell(col));
       if (val) {
-        const match = val.match(/\b(7|8|9|10|11)\b/);
+        const match = val.match(/\b(7|8|9|10|11|12)\b/);
         if (match) {
           semesterMap[col] = parseInt(match[1]);
         }
@@ -911,14 +913,19 @@ export const getGradeRecap = async (req: Request, res: Response, next: NextFunct
       orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
     });
 
+    const activeSemestersStr = (weight as any).activeSemesters || "7,8,9,10,11";
+    const activeSemesters = activeSemestersStr.split(',').map((s: string) => parseInt(s.trim(), 10)).filter((n: number) => !isNaN(n));
+
     const recap = students.map((student) => {
       // Group student report card grades by subjectId and compute average
       const reportGradesBySubject: Record<string, number[]> = {};
       student.reportGrades.forEach((rg) => {
-        if (!reportGradesBySubject[rg.subjectId]) {
-          reportGradesBySubject[rg.subjectId] = [];
+        if (activeSemesters.includes(rg.semester)) {
+          if (!reportGradesBySubject[rg.subjectId]) {
+            reportGradesBySubject[rg.subjectId] = [];
+          }
+          reportGradesBySubject[rg.subjectId].push(rg.score);
         }
-        reportGradesBySubject[rg.subjectId].push(rg.score);
       });
 
       // Group student exam grades by subjectId
@@ -1036,13 +1043,18 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
       orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
     });
 
+    const activeSemestersStr = (weight as any).activeSemesters || "7,8,9,10,11";
+    const activeSemesters = activeSemestersStr.split(',').map((s: string) => parseInt(s.trim(), 10)).filter((n: number) => !isNaN(n));
+
     const recapRaw = students.map((student) => {
       const reportGradesBySubject: Record<string, number[]> = {};
       student.reportGrades.forEach((rg) => {
-        if (!reportGradesBySubject[rg.subjectId]) {
-          reportGradesBySubject[rg.subjectId] = [];
+        if (activeSemesters.includes(rg.semester)) {
+          if (!reportGradesBySubject[rg.subjectId]) {
+            reportGradesBySubject[rg.subjectId] = [];
+          }
+          reportGradesBySubject[rg.subjectId].push(rg.score);
         }
-        reportGradesBySubject[rg.subjectId].push(rg.score);
       });
 
       const examGradesBySubject: Record<string, number> = {};
@@ -1246,7 +1258,7 @@ export const getMissingGrades = async (req: Request, res: Response, next: NextFu
       }),
     ]);
 
-    const SEMESTERS = [7, 8, 9, 10, 11];
+    const SEMESTERS = [7, 8, 9, 10, 11, 12];
 
     // Build lookup sets for fast O(1) checking
     const reportSet = new Set(
@@ -1396,7 +1408,7 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
           width: 12
         });
       } else {
-        for (let sem = 7; sem <= 11; sem++) {
+        for (let sem = 7; sem <= 12; sem++) {
           columns.push({
             key: `${subj.code}_sem${sem}`,
             width: 10
@@ -1427,8 +1439,8 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
         };
         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       } else {
-        const startCol = 4 + i * 5;
-        const endCol = startCol + 4;
+        const startCol = 4 + i * 6;
+        const endCol = startCol + 5;
         worksheet.mergeCells(1, startCol, 1, endCol);
         const cell = row1.getCell(startCol);
         cell.value = `[${subj.code}] ${subj.name}`;
@@ -1474,8 +1486,8 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
         };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
       } else {
-        const startCol = 4 + i * 5;
-        for (let sem = 7; sem <= 11; sem++) {
+        const startCol = 4 + i * 6;
+        for (let sem = 7; sem <= 12; sem++) {
           const colIdx = startCol + (sem - 7);
           const cell = row2.getCell(colIdx);
           cell.value = `Smt ${sem}`;
@@ -1535,7 +1547,7 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
           );
           rowData[`${subj.code}_sem${targetSemester}`] = matchingGrade ? matchingGrade.score : '';
         } else {
-          for (let sem = 7; sem <= 11; sem++) {
+          for (let sem = 7; sem <= 12; sem++) {
             const matchingGrade = student.reportGrades.find(
               (rg) => rg.subjectId === subj.id && rg.semester === sem
             );

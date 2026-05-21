@@ -4,6 +4,8 @@ import prisma from '../db';
 import { createStudentSchema, updateStudentSchema } from '../validators/student.validator';
 import { Gender } from '@prisma/client';
 import fs from 'fs';
+import path from 'path';
+import AdmZip from 'adm-zip';
 
 // Get all students
 export const getAllStudents = async (req: Request, res: Response, next: NextFunction) => {
@@ -562,6 +564,92 @@ export const batchAssignSklNumbers = async (req: Request, res: Response, next: N
       preview: updates.slice(0, 3).map(u => u.sklNumber),
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+// Upload photos via ZIP
+export const uploadPhotos = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Tidak ada file ZIP yang diunggah.' });
+    }
+
+    if (req.file.mimetype !== 'application/zip' && req.file.mimetype !== 'application/x-zip-compressed' && !req.file.originalname.endsWith('.zip')) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ message: 'File harus berformat .zip' });
+    }
+
+    const zipFilePath = req.file.path;
+    const extractDir = path.join(process.cwd(), 'public', 'uploads', 'photos');
+    
+    // Ensure photos directory exists
+    if (!fs.existsSync(extractDir)) {
+      fs.mkdirSync(extractDir, { recursive: true });
+    }
+
+    const zip = new AdmZip(zipFilePath);
+    const zipEntries = zip.getEntries();
+    
+    let successCount = 0;
+    const errors: string[] = [];
+
+    // Valid image extensions
+    const validExts = ['.jpg', '.jpeg', '.png'];
+
+    for (const zipEntry of zipEntries) {
+      if (zipEntry.isDirectory) continue;
+      
+      const fileName = zipEntry.entryName;
+      // Skip hidden files or macOS __MACOSX folders
+      if (fileName.startsWith('__MACOSX') || fileName.includes('/._') || fileName.split('/').pop()?.startsWith('.')) continue;
+      
+      const ext = path.extname(fileName).toLowerCase();
+      if (!validExts.includes(ext)) continue;
+
+      // Extract the filename without extension (this should be the NISN)
+      const baseName = path.basename(fileName, ext);
+      const nisn = baseName.trim();
+
+      if (!nisn) continue;
+
+      // Check if student with this NISN exists
+      const student = await prisma.student.findUnique({ where: { nisn } });
+      if (!student) {
+        errors.push(`NISN ${nisn} tidak ditemukan di database (${fileName}).`);
+        continue;
+      }
+
+      // Save the photo as {studentId}{ext}
+      const newFileName = `${student.id}${ext}`;
+      const destPath = path.join(extractDir, newFileName);
+
+      // Extract entry to buffer and save
+      const fileData = zipEntry.getData();
+      fs.writeFileSync(destPath, fileData);
+
+      // Update student photoUrl in DB
+      const photoUrl = `/uploads/photos/${newFileName}`;
+      await prisma.student.update({
+        where: { id: student.id },
+        data: { photoUrl },
+      });
+
+      successCount++;
+    }
+
+    // Delete uploaded ZIP
+    fs.unlinkSync(zipFilePath);
+
+    return res.status(200).json({
+      message: `Berhasil memproses ${successCount} foto.`,
+      successCount,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
     next(error);
   }
 };

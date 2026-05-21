@@ -11,6 +11,7 @@ import {
   updateGraduationStatus,
   batchUpdateGraduation,
   batchAssignSklNumbers,
+  uploadPhotos,
 } from '../controllers/student.controller';
 import { authenticateJWT } from '../middlewares/auth.middleware';
 import { requireRoles } from '../middlewares/rbac.middleware';
@@ -26,6 +27,7 @@ router.use(authenticateJWT);
 router.get('/template', requireRoles(Role.ADMIN, Role.STAFF), getStudentTemplate);
 router.get('/export', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), exportStudents);
 router.post('/import', requireRoles(Role.ADMIN, Role.STAFF), upload.single('file'), importStudents);
+router.post('/upload-photos', requireRoles(Role.ADMIN, Role.STAFF), upload.single('file'), uploadPhotos);
 
 // Standard CRUD routes
 router.get('/', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getAllStudents);

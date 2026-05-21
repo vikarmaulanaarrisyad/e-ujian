@@ -220,9 +220,18 @@ export default function PrintIjazahPage() {
         <div className="flex justify-between mt-12 px-8">
           <div className="w-48">
             {/* Photo slot */}
-            <div className="w-32 h-40 border border-black flex items-center justify-center text-xs text-center p-2 mb-2">
-              Pas Foto<br/>3 x 4 cm<br/><br/>Cap Tiga Jari<br/>Tengah Kiri
-            </div>
+            {student.photoUrl ? (
+              <img 
+                src={`http://localhost:5000${student.photoUrl}`} 
+                alt="Pas Foto" 
+                className="w-[3cm] h-[4cm] object-cover border-2 border-black mb-2"
+                crossOrigin="anonymous" 
+              />
+            ) : (
+              <div className="w-[3cm] h-[4cm] border-2 border-black flex items-center justify-center text-xs text-center p-2 mb-2">
+                Pas Foto<br/>3 x 4 cm<br/><br/>Cap Tiga Jari<br/>Tengah Kiri
+              </div>
+            )}
           </div>
           
           <div className="w-64 text-left">

@@ -17,7 +17,8 @@ import {
   AlertCircle,
   ChevronUp,
   ChevronDown,
-  ChevronsUpDown
+  ChevronsUpDown,
+  ImagePlus
 } from 'lucide-react';
 import {
   useReactTable,
@@ -47,9 +48,11 @@ export default function StudentsPage() {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const zipInputRef = useRef<HTMLInputElement>(null);
 
   // States
   const [importing, setImporting] = useState(false);
+  const [uploadingZip, setUploadingZip] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -356,6 +359,31 @@ export default function StudentsPage() {
     }
   };
 
+  // ZIP Photo Upload
+  const handleImportZip = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setUploadingZip(true);
+      const res = await api.post('/students/upload-photos', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      showToast(res.data.message || 'Upload foto massal berhasil!', 'success');
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    } catch (err: any) {
+      console.error(err);
+      const msg = err.response?.data?.errors?.join('\n') || err.response?.data?.message || 'Gagal mengunggah foto.';
+      showToast(msg, 'error');
+    } finally {
+      setUploadingZip(false);
+      if (zipInputRef.current) zipInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header and top action bar */}
@@ -393,11 +421,27 @@ export default function StudentsPage() {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                disabled={importing}
+                disabled={importing || uploadingZip}
                 className="px-4 py-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 flex items-center gap-2 cursor-pointer transition-all duration-200 disabled:opacity-50"
               >
                 <Upload className="w-4 h-4 text-indigo-400" />
                 <span>{importing ? 'Mengimpor...' : 'Impor Siswa'}</span>
+              </button>
+
+              <input
+                type="file"
+                ref={zipInputRef}
+                onChange={handleImportZip}
+                className="hidden"
+                accept=".zip"
+              />
+              <button
+                onClick={() => zipInputRef.current?.click()}
+                disabled={uploadingZip || importing}
+                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 flex items-center gap-2 cursor-pointer transition-all duration-200 disabled:opacity-50"
+              >
+                <ImagePlus className="w-4 h-4 text-pink-400" />
+                <span>{uploadingZip ? 'Mengunggah...' : 'Upload Foto (ZIP)'}</span>
               </button>
 
               <button

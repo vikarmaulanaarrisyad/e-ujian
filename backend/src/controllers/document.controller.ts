@@ -76,13 +76,18 @@ export const getStudentDocumentData = async (req: Request, res: Response, next: 
       orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
     });
 
-    // Group report grades by subject
+    const activeSemestersStr = weight.activeSemesters || "7,8,9,10,11";
+    const activeSemesters = activeSemestersStr.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+
+    // Group report grades by subject (only if semester is in activeSemesters)
     const reportGradesBySubject: Record<string, number[]> = {};
     student.reportGrades.forEach((rg) => {
-      if (!reportGradesBySubject[rg.subjectId]) {
-        reportGradesBySubject[rg.subjectId] = [];
+      if (activeSemesters.includes(rg.semester)) {
+        if (!reportGradesBySubject[rg.subjectId]) {
+          reportGradesBySubject[rg.subjectId] = [];
+        }
+        reportGradesBySubject[rg.subjectId].push(rg.score);
       }
-      reportGradesBySubject[rg.subjectId].push(rg.score);
     });
 
     // Group exam grades by subject

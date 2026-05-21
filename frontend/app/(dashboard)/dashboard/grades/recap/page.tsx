@@ -116,7 +116,7 @@ export default function GradeRecapPage() {
       doc.setFontSize(10);
       doc.text(`Tahun Pelajaran: ${data?.academicYear?.year || '...'} | Semester: ${data?.academicYear?.semester === 'EVEN' ? 'GENAP' : 'GANJIL'}`, pageWidth / 2, 54, { align: 'center' });
       doc.setFont('times', 'italic');
-      doc.text(`Kalkulasi Bobot: Rapor ${data?.weight?.reportPercentage || 60}% & Ujian ${data?.weight?.examPercentage || 40}%`, pageWidth / 2, 59, { align: 'center' });
+      doc.text(`Kalkulasi Bobot: Rapor ${data?.weight?.reportPercentage || 60}% (Semester: ${data?.weight?.activeSemesters || '7,8,9,10,11'}) & Ujian ${data?.weight?.examPercentage || 40}%`, pageWidth / 2, 59, { align: 'center' });
       
       // Prepare Table Data
       const subjects = data.recap[0]?.subjectScores || [];
@@ -255,7 +255,7 @@ export default function GradeRecapPage() {
         <div>
           <h2 className="text-xl font-bold text-slate-100 tracking-wide">Rekapitulasi Nilai Akhir</h2>
           <p className="text-xs text-slate-450 mt-1">
-            Kalkulasi nilai akhir kelulusan (Rata-rata Rapor {data?.weight?.reportPercentage || 60}% & Ujian Madrasah {data?.weight?.examPercentage || 40}%).
+            Kalkulasi nilai akhir kelulusan (Rata-rata Rapor {data?.weight?.reportPercentage || 60}% dari Semester {data?.weight?.activeSemesters || '7,8,9,10,11'} & Ujian Madrasah {data?.weight?.examPercentage || 40}%).
           </p>
         </div>
 
@@ -303,7 +303,7 @@ export default function GradeRecapPage() {
             <h3 className="font-bold text-slate-200">Rincian Nilai Akhir</h3>
           </div>
           <div className="px-3.5 py-1.5 rounded-full bg-slate-950/80 border border-slate-800 text-[10px] font-semibold text-slate-455">
-            Formula: Rapor ({data?.weight?.reportPercentage || 60}%) + Ujian ({data?.weight?.examPercentage || 40}%)
+            Formula: Rapor {data?.weight?.reportPercentage || 60}% (Smt {data?.weight?.activeSemesters || '7,8,9,10,11'}) + Ujian {data?.weight?.examPercentage || 40}%
           </div>
         </div>
 

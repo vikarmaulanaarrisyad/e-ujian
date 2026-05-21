@@ -78,6 +78,7 @@ export default function ReportGradesPage() {
           9: student.grades[9] !== null ? student.grades[9] : '',
           10: student.grades[10] !== null ? student.grades[10] : '',
           11: student.grades[11] !== null ? student.grades[11] : '',
+          12: student.grades[12] !== null ? student.grades[12] : '',
         };
       });
       setGridGrades(initialGrid);
@@ -122,7 +123,7 @@ export default function ReportGradesPage() {
     const gradesArray: any[] = [];
     Object.keys(gridGrades).forEach((studentId) => {
       const semesters = gridGrades[studentId];
-      [7, 8, 9, 10, 11].forEach((sem) => {
+      [7, 8, 9, 10, 11, 12].forEach((sem) => {
         const score = semesters[sem];
         if (score !== '') {
           gradesArray.push({
@@ -418,6 +419,7 @@ export default function ReportGradesPage() {
               <option value="9">Semester 9</option>
               <option value="10">Semester 10</option>
               <option value="11">Semester 11</option>
+              <option value="12">Semester 12</option>
             </select>
           </div>
         </div>
@@ -464,6 +466,7 @@ export default function ReportGradesPage() {
                     {(!selectedSemester || selectedSemester === '9') && <th className="py-3.5 px-4 text-center">Smt 9</th>}
                     {(!selectedSemester || selectedSemester === '10') && <th className="py-3.5 px-4 text-center">Smt 10</th>}
                     {(!selectedSemester || selectedSemester === '11') && <th className="py-3.5 px-4 text-center">Smt 11</th>}
+                    {(!selectedSemester || selectedSemester === '12') && <th className="py-3.5 px-4 text-center">Smt 12</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/40 text-xs text-slate-300">
@@ -471,7 +474,7 @@ export default function ReportGradesPage() {
                     <tr key={student.studentId} className="hover:bg-slate-900/10">
                       <td className="py-3.5 px-4 font-mono text-slate-450">{student.nis}</td>
                       <td className="py-3.5 px-4 font-semibold text-slate-205">{student.studentName}</td>
-                      {[7, 8, 9, 10, 11].map((sem) => {
+                      {[7, 8, 9, 10, 11, 12].map((sem) => {
                         if (selectedSemester && selectedSemester !== String(sem)) return null;
                         return (
                           <td key={sem} className="py-2.5 px-4 text-center">

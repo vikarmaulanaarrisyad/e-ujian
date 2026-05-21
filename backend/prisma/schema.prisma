@@ -90,6 +90,7 @@ model Student {
   placeOfBirth      String?   @map("place_of_birth")
   dateOfBirth       DateTime? @map("date_of_birth")
   parentName        String?   @map("parent_name")
+  photoUrl          String?   @map("photo_url") // Foto Siswa
   // Graduation fields
   isGraduated       Boolean   @default(false) @map("is_graduated")
   graduationDate    DateTime? @map("graduation_date")
@@ -125,6 +126,7 @@ model GradeWeight {
   id               String   @id @default(uuid())
   reportPercentage Float    @default(60.0) // Bobot Nilai Rapor (e.g. 60.0)
   examPercentage   Float    @default(40.0) // Bobot Nilai Ujian (e.g. 40.0)
+  activeSemesters  String   @default("7,8,9,10,11") @map("active_semesters")
   academicYearId   String   @map("academic_year_id")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
