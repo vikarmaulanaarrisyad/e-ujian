@@ -22,6 +22,10 @@ export const getAllStudents = async (req: Request, res: Response, next: NextFunc
     if (className) {
       filter.class = String(className);
     }
+    
+    // Alumni filter
+    const isAlumniParam = req.query.alumni === 'true';
+    filter.isAlumni = isAlumniParam;
 
     const students = await prisma.student.findMany({
       where: filter,
@@ -650,6 +654,49 @@ export const uploadPhotos = async (req: Request, res: Response, next: NextFuncti
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
+    next(error);
+  }
+};
+
+// Archive graduated students to Alumni
+export const archiveStudents = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Cari siswa yang sudah lulus tapi belum jadi alumni
+    const graduatedStudents = await prisma.student.findMany({
+      where: {
+        isGraduated: true,
+        isAlumni: false,
+      },
+    });
+
+    if (graduatedStudents.length === 0) {
+      return res.status(400).json({ message: 'Tidak ada siswa lulus yang bisa diarsipkan.' });
+    }
+
+    // Dapatkan tahun ajaran aktif untuk label alumni
+    const activeYearRecord = await prisma.academicYear.findFirst({
+      where: { isActive: true },
+    });
+    
+    const alumniYearStr = activeYearRecord ? activeYearRecord.year : new Date().getFullYear().toString();
+
+    // Lakukan pemindahan secara massal
+    const result = await prisma.student.updateMany({
+      where: {
+        isGraduated: true,
+        isAlumni: false,
+      },
+      data: {
+        isAlumni: true,
+        alumniYear: alumniYearStr,
+      },
+    });
+
+    return res.status(200).json({
+      message: `Berhasil mengarsipkan ${result.count} siswa ke Data Alumni.`,
+      archivedCount: result.count,
+    });
+  } catch (error) {
     next(error);
   }
 };

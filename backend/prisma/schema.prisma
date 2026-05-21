@@ -96,6 +96,8 @@ model Student {
   graduationDate    DateTime? @map("graduation_date")
   certificateNumber String?   @unique @map("certificate_number")
   sklNumber         String?   @map("skl_number") // Nomor SKL yang ditetapkan
+  isAlumni          Boolean   @default(false) @map("is_alumni")
+  alumniYear        String?   @map("alumni_year")
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

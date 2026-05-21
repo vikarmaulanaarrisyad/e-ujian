@@ -70,6 +70,9 @@ export default function GraduationPage() {
   const [assignSklModalOpen, setAssignSklModalOpen] = useState(false);
   const [sklFormat, setSklFormat] = useState('');
   const [overwriteSkl, setOverwriteSkl] = useState(false);
+  
+  // Archive modal state
+  const [archiveModalOpen, setArchiveModalOpen] = useState(false);
 
   // Fetch Students
   const { data: students = [], isLoading } = useQuery<Student[]>({
@@ -142,6 +145,21 @@ export default function GraduationPage() {
     },
     onError: (err: any) => {
       showToast(err.response?.data?.message || 'Gagal meluluskan siswa.', 'error');
+    },
+  });
+
+  // Archive Mutation
+  const archiveMutation = useMutation({
+    mutationFn: async () => {
+      return await api.post('/students/archive');
+    },
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      showToast(res.data.message || 'Siswa berhasil diarsipkan!', 'success');
+      setArchiveModalOpen(false);
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || 'Gagal mengarsipkan siswa.', 'error');
     },
   });
 
@@ -369,6 +387,15 @@ export default function GraduationPage() {
               >
                 <CheckSquare className="w-4 h-4" />
                 Luluskan Semua
+              </button>
+
+              {/* Archive Graduated */}
+              <button
+                onClick={() => setArchiveModalOpen(true)}
+                className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-amber-600/10"
+              >
+                <ClipboardList className="w-4 h-4" />
+                Arsip Lulusan
               </button>
             </>
           )}
@@ -674,6 +701,58 @@ export default function GraduationPage() {
                   {assignSklMutation.isPending
                     ? <><RefreshCw className="w-4 h-4 animate-spin" /> Memproses...</>
                     : <><Hash className="w-4 h-4" /> Assign Nomor SKL</>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Archive Modal */}
+      {archiveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="flex items-center gap-3 mb-6 border-b border-slate-800/60 pb-4">
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <ClipboardList className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-100 text-lg">Arsip Siswa Lulus</h3>
+                <p className="text-[11px] text-slate-450 mt-0.5">Pindahkan semua lulusan ke Data Alumni</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 relative z-10">
+              <p className="text-sm text-slate-300">
+                Tindakan ini akan memindahkan semua siswa yang statusnya <strong className="text-emerald-400">Lulus</strong> dari halaman Data Siswa ke halaman <strong>Data Alumni</strong>.
+              </p>
+              
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-3">
+                <AlertCircle className="w-5 h-5 shrink-0 text-amber-400 mt-0.5" />
+                <div className="text-xs text-amber-200">
+                  <p className="font-bold mb-1">Informasi Penting:</p>
+                  <ul className="list-disc pl-4 space-y-1 opacity-90">
+                    <li>Siswa alumni tidak akan muncul di Data Siswa aktif.</li>
+                    <li>Siswa alumni akan ditandai dengan tahun ajaran saat ini.</li>
+                    <li>Anda masih bisa mencetak ulang SKL & Ijazah dari halaman Data Alumni.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-slate-800/60">
+                <button type="button" onClick={() => setArchiveModalOpen(false)} className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold transition-colors">
+                  Batal
+                </button>
+                <button
+                  onClick={() => archiveMutation.mutate()}
+                  disabled={archiveMutation.isPending}
+                  className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                >
+                  {archiveMutation.isPending
+                    ? <><RefreshCw className="w-4 h-4 animate-spin" /> Memproses...</>
+                    : <><ClipboardList className="w-4 h-4" /> Pindahkan</>
                   }
                 </button>
               </div>
