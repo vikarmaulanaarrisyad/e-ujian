@@ -436,3 +436,59 @@ export const importStudents = async (req: Request, res: Response, next: NextFunc
     next(error);
   }
 };
+
+// Update graduation status
+export const updateGraduationStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { isGraduated, graduationDate, certificateNumber } = req.body;
+
+    const student = await prisma.student.findUnique({ where: { id } });
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    if (certificateNumber && certificateNumber !== student.certificateNumber) {
+      const existing = await prisma.student.findUnique({ where: { certificateNumber } });
+      if (existing) {
+        return res.status(400).json({ message: 'Nomor seri ijazah sudah digunakan oleh siswa lain.' });
+      }
+    }
+
+    const updated = await prisma.student.update({
+      where: { id },
+      data: {
+        isGraduated,
+        graduationDate: graduationDate ? new Date(graduationDate) : null,
+        certificateNumber: certificateNumber || null,
+      },
+    });
+
+    return res.status(200).json({ message: 'Status kelulusan diperbarui', student: updated });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Batch update graduation status
+export const batchUpdateGraduation = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { studentIds, isGraduated, graduationDate } = req.body;
+
+    if (!Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({ message: 'Daftar ID siswa tidak valid.' });
+    }
+
+    await prisma.student.updateMany({
+      where: { id: { in: studentIds } },
+      data: {
+        isGraduated,
+        graduationDate: graduationDate ? new Date(graduationDate) : null,
+      },
+    });
+
+    return res.status(200).json({ message: `${studentIds.length} siswa berhasil diperbarui status kelulusannya.` });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -76,17 +76,21 @@ model AcademicYear {
 }
 
 model Student {
-  id           String   @id @default(uuid())
-  nis          String   @unique
-  nisn         String   @unique
-  name         String
-  gender       Gender
-  class        String   @default("6")
-  placeOfBirth String?  @map("place_of_birth")
-  dateOfBirth  DateTime? @map("date_of_birth")
-  parentName   String?  @map("parent_name")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String    @id @default(uuid())
+  nis               String    @unique
+  nisn              String    @unique
+  name              String
+  gender            Gender
+  class             String    @default("6")
+  placeOfBirth      String?   @map("place_of_birth")
+  dateOfBirth       DateTime? @map("date_of_birth")
+  parentName        String?   @map("parent_name")
+  // Graduation fields
+  isGraduated       Boolean   @default(false) @map("is_graduated")
+  graduationDate    DateTime? @map("graduation_date")
+  certificateNumber String?   @unique @map("certificate_number")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   // Relations
   reportGrades ReportGrade[]

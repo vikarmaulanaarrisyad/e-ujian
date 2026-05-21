@@ -8,6 +8,8 @@ import {
   getStudentTemplate,
   exportStudents,
   importStudents,
+  updateGraduationStatus,
+  batchUpdateGraduation,
 } from '../controllers/student.controller';
 import { authenticateJWT } from '../middlewares/auth.middleware';
 import { requireRoles } from '../middlewares/rbac.middleware';
@@ -30,5 +32,9 @@ router.get('/:id', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getStudentBy
 router.post('/', requireRoles(Role.ADMIN, Role.STAFF), createStudent);
 router.put('/:id', requireRoles(Role.ADMIN, Role.STAFF), updateStudent);
 router.delete('/:id', requireRoles(Role.ADMIN), deleteStudent);
+
+// Graduation routes
+router.patch('/:id/graduation', requireRoles(Role.ADMIN, Role.STAFF), updateGraduationStatus);
+router.post('/graduation/batch', requireRoles(Role.ADMIN, Role.STAFF), batchUpdateGraduation);
 
 export default router;

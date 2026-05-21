@@ -1,0 +1,15 @@
+import { Router } from 'express';
+import { getStudentDocumentData } from '../controllers/document.controller';
+import { authenticateJWT } from '../middlewares/auth.middleware';
+import { requireRoles } from '../middlewares/rbac.middleware';
+import { Role } from '@prisma/client';
+
+const router = Router();
+
+// Apply auth middleware to all document routes
+router.use(authenticateJWT);
+
+// Document routes
+router.get('/student/:id', requireRoles(Role.ADMIN, Role.STAFF), getStudentDocumentData);
+
+export default router;

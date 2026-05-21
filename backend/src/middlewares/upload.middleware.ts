@@ -49,3 +49,20 @@ export const uploadJson = multer({
   fileFilter: jsonFileFilter,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for backups
 });
+
+// ── Image uploader for school logos ──
+const imageFileFilter = (req: any, file: any, cb: any) => {
+  const allowedExtensions = ['.png', '.jpg', '.jpeg'];
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (allowedExtensions.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files (.png, .jpg, .jpeg) are allowed'), false);
+  }
+};
+
+export const uploadImage = multer({
+  storage,
+  fileFilter: imageFileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+});

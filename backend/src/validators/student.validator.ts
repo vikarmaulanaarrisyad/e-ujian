@@ -13,6 +13,12 @@ export const createStudentSchema = z.object({
     return arg;
   }, z.date().optional()),
   parentName: z.string().optional(),
+  isGraduated: z.boolean().default(false).optional(),
+  graduationDate: z.preprocess((arg) => {
+    if (typeof arg === 'string' && arg) return new Date(arg);
+    return arg;
+  }, z.date().optional().nullable()),
+  certificateNumber: z.string().optional().nullable(),
 });
 
 export const updateStudentSchema = createStudentSchema.partial();

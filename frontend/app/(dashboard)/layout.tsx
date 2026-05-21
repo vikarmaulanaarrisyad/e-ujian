@@ -17,7 +17,8 @@ import {
   ChevronRight,
   BookOpen,
   BookMarked,
-  AlertTriangle
+  AlertTriangle,
+  Award
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -36,12 +37,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'GURU', 'STAFF'] },
+    { name: 'Profil Madrasah', href: '/dashboard/school', icon: School, roles: ['ADMIN'] },
     { name: 'Data Siswa', href: '/dashboard/students', icon: Users, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Mata Pelajaran', href: '/dashboard/subjects', icon: BookMarked, roles: ['ADMIN'] },
     { name: 'Input Nilai Rapor', href: '/dashboard/grades/reports', icon: BookOpen, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Input Nilai Ujian', href: '/dashboard/grades/exams', icon: GraduationCap, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Rekap Nilai', href: '/dashboard/grades/recap', icon: FileSpreadsheet, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Nilai Belum Masuk', href: '/dashboard/grades/missing', icon: AlertTriangle, roles: ['ADMIN', 'GURU', 'STAFF'] },
+    { name: 'Kelulusan Siswa', href: '/dashboard/students/graduation', icon: Award, roles: ['ADMIN', 'STAFF'] },
     { name: 'Pengaturan Bobot', href: '/dashboard/settings', icon: Settings, roles: ['ADMIN'] },
   ];
 

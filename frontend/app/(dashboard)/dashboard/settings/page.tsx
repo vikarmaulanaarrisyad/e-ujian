@@ -154,7 +154,6 @@ export default function SettingsPage() {
     setPendingFile(file);
     setConfirmText('');
     setConfirmOpen(true);
-    // Reset input so same file can be re-selected
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -174,7 +173,6 @@ export default function SettingsPage() {
       });
       setRestoreResult(res.data);
       setRestoreResultOpen(true);
-      // Invalidate all cached queries since data has changed
       queryClient.clear();
     } catch (err: any) {
       const msg =
@@ -324,31 +322,28 @@ export default function SettingsPage() {
         </div>
 
         {/* Download Backup */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-300">Unduh Backup</p>
-              <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1.5">
-                <Clock className="w-3 h-3" />
-                {lastBackupTime ? `Terakhir: ${lastBackupTime}` : 'Belum pernah backup'}
-              </p>
-            </div>
-            <button
-              onClick={handleDownloadBackup}
-              disabled={isDownloadingBackup}
-              className="flex items-center gap-2 px-4 py-2.5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/40 text-amber-400 rounded-xl text-xs font-semibold transition-all duration-200 disabled:opacity-50 cursor-pointer"
-            >
-              {isDownloadingBackup ? (
-                <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-              {isDownloadingBackup ? 'Menyiapkan...' : 'Unduh Backup (.json)'}
-            </button>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-300">Unduh Backup</p>
+            <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1.5">
+              <Clock className="w-3 h-3" />
+              {lastBackupTime ? `Terakhir: ${lastBackupTime}` : 'Belum pernah backup'}
+            </p>
           </div>
+          <button
+            onClick={handleDownloadBackup}
+            disabled={isDownloadingBackup}
+            className="flex items-center gap-2 px-4 py-2.5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/40 text-amber-400 rounded-xl text-xs font-semibold transition-all duration-200 disabled:opacity-50 cursor-pointer"
+          >
+            {isDownloadingBackup ? (
+              <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            {isDownloadingBackup ? 'Menyiapkan...' : 'Unduh Backup (.json)'}
+          </button>
         </div>
 
-        {/* Divider */}
         <div className="border-t border-slate-800/60" />
 
         {/* Restore */}
@@ -360,12 +355,11 @@ export default function SettingsPage() {
             </p>
           </div>
 
-          {/* Warning */}
           <div className="flex items-start gap-3 p-3.5 rounded-xl bg-rose-950/30 border border-rose-900/50">
             <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
             <p className="text-[10px] text-rose-300 leading-relaxed">
-              <strong>Peringatan:</strong> Restore akan <strong>menghapus SEMUA data saat ini</strong> dan menggantinya
-              dengan data dari file backup. Proses ini tidak dapat dibatalkan.
+              <strong>Peringatan:</strong> Restore akan <strong>menghapus SEMUA data saat ini</strong> dan
+              menggantinya dengan data dari file backup. Proses ini tidak dapat dibatalkan.
             </p>
           </div>
 
@@ -396,13 +390,10 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════
-          CONFIRMATION MODAL
-      ══════════════════════════════════════════ */}
+      {/* ══ CONFIRMATION MODAL ══ */}
       {confirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-slate-900 border border-rose-900/50 rounded-2xl shadow-2xl shadow-rose-950/30 overflow-hidden">
-            {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20">
@@ -418,11 +409,10 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="px-6 py-5 space-y-4">
               <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-900/40 text-xs text-rose-300 space-y-2 leading-relaxed">
                 <p><strong>⚠️ Tindakan ini tidak dapat dibatalkan.</strong></p>
-                <p>Seluruh data database saat ini akan dihapus dan diganti dengan data dari file backup:</p>
+                <p>Seluruh data database saat ini akan dihapus dan diganti dengan data dari:</p>
                 <p className="font-mono text-rose-400 text-[11px] bg-rose-950/40 px-2 py-1 rounded">
                   {pendingFile?.name}
                 </p>
@@ -443,7 +433,6 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Modal Footer */}
             <div className="flex gap-3 px-6 py-4 border-t border-slate-800">
               <button
                 onClick={() => { setConfirmOpen(false); setPendingFile(null); setConfirmText(''); }}
@@ -464,9 +453,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════
-          RESTORE RESULT MODAL
-      ══════════════════════════════════════════ */}
+      {/* ══ RESTORE RESULT MODAL ══ */}
       {restoreResultOpen && restoreResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-slate-900 border border-emerald-900/50 rounded-2xl shadow-2xl overflow-hidden">
@@ -494,7 +481,7 @@ export default function SettingsPage() {
                   </span>
                 </p>
                 <p>
-                  Restore selesai pada:{' '}
+                  Restore selesai:{' '}
                   <span className="text-slate-300 font-semibold">
                     {new Date(restoreResult.restoredAt).toLocaleString('id-ID')}
                   </span>
@@ -536,184 +523,6 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-
-export default function SettingsPage() {
-  const { user } = useAuth();
-  const router = useRouter();
-  const queryClient = useQueryClient();
-
-  const [reportPercentage, setReportPercentage] = useState<number>(60);
-  const [examPercentage, setExamPercentage] = useState<number>(40);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-
-  // Redirect if not ADMIN
-  useEffect(() => {
-    if (user && user.role !== 'ADMIN') {
-      router.push('/dashboard');
-    }
-  }, [user, router]);
-
-  // Fetch Weight Settings
-  const { data, isLoading } = useQuery({
-    queryKey: ['weight'],
-    queryFn: async () => {
-      const res = await api.get('/grades/weight');
-      return res.data;
-    },
-  });
-
-  // Sync to states
-  useEffect(() => {
-    if (data?.weight) {
-      setReportPercentage(data.weight.reportPercentage);
-      setExamPercentage(data.weight.examPercentage);
-    }
-  }, [data]);
-
-  const updateMutation = useMutation({
-    mutationFn: async (payload: any) => {
-      return await api.put('/grades/weight', payload);
-    },
-    onSuccess: () => {
-      setSuccess(true);
-      setError(null);
-      queryClient.invalidateQueries({ queryKey: ['weight'] });
-      queryClient.invalidateQueries({ queryKey: ['recap'] });
-      setTimeout(() => setSuccess(false), 3000);
-    },
-    onError: (err: any) => {
-      setSuccess(false);
-      setError(err.response?.data?.message || 'Gagal menyimpan konfigurasi bobot.');
-    }
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccess(false);
-
-    if (reportPercentage + examPercentage !== 100) {
-      setError('Total pembobotan harus sama dengan 100%!');
-      return;
-    }
-
-    updateMutation.mutate({
-      reportPercentage,
-      examPercentage,
-    });
-  };
-
-  if (user?.role !== 'ADMIN') {
-    return null;
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Header section */}
-      <div>
-        <h2 className="text-xl font-bold text-slate-100 tracking-wide">Pengaturan Sistem</h2>
-        <p className="text-xs text-slate-450 mt-1">Konfigurasi pembobotan nilai akhir dan preferensi kelulusan.</p>
-      </div>
-
-      <div className="max-w-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-7 backdrop-blur-md shadow-xl">
-        <div className="flex items-center gap-3.5 mb-6 border-b border-slate-800/60 pb-4">
-          <div className="p-2.5 rounded-xl bg-indigo-550/10 border border-indigo-500/20 text-indigo-400">
-            <Settings className="w-5 h-5" />
-          </div>
-          <h3 className="font-bold text-slate-200">Bobot Persentase Nilai Akhir</h3>
-        </div>
-
-        {isLoading ? (
-          <div className="py-8 text-center text-slate-500 text-xs">
-            <div className="w-6 h-6 border-2 border-indigo-550 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            Memuat pengaturan bobot...
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {success && (
-              <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs text-emerald-450">
-                <CheckCircle2 className="w-4.5 h-4.5 shrink-0" />
-                <span>Konfigurasi pembobotan berhasil diperbarui.</span>
-              </div>
-            )}
-
-            {error && (
-              <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-xs text-rose-455">
-                <AlertCircle className="w-4.5 h-4.5 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">
-                  Persentase Nilai Rapor (%)
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    required
-                    value={reportPercentage}
-                    onChange={(e) => setReportPercentage(Number(e.target.value))}
-                    className="block w-32 px-3.5 py-2.5 bg-slate-955 border border-slate-800 rounded-xl font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors"
-                  />
-                  <span className="text-slate-500 text-xs font-medium">
-                    Bobot rata-rata nilai rapor (Sem 7-11)
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-505 uppercase tracking-wider mb-2.5">
-                  Persentase Nilai Ujian (%)
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    required
-                    value={examPercentage}
-                    onChange={(e) => setExamPercentage(Number(e.target.value))}
-                    className="block w-32 px-3.5 py-2.5 bg-slate-955 border border-slate-800 rounded-xl font-mono text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors"
-                  />
-                  <span className="text-slate-500 text-xs font-medium">
-                    Bobot nilai ujian madrasah
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-800/60 mt-6 flex justify-between items-center">
-              <div className="text-[11px] text-slate-500 font-semibold uppercase">
-                Total: <span className={reportPercentage + examPercentage === 100 ? 'text-emerald-450 font-bold' : 'text-rose-455 font-bold'}>
-                  {reportPercentage + examPercentage}%
-                </span>
-              </div>
-
-              <button
-                type="submit"
-                disabled={updateMutation.isPending}
-                className="px-5 py-2.5 bg-indigo-650 hover:bg-indigo-600 active:bg-indigo-700 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-md shadow-indigo-600/10 flex items-center gap-2 transition-all duration-200 disabled:opacity-50"
-              >
-                {updateMutation.isPending ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                <span>Simpan Pengaturan</span>
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
     </div>
   );
 }
