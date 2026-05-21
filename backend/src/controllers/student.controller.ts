@@ -492,3 +492,76 @@ export const batchUpdateGraduation = async (req: Request, res: Response, next: N
     next(error);
   }
 };
+
+// Batch assign SKL numbers to all graduated students
+export const batchAssignSklNumbers = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { format, overwrite } = req.body;
+    // format: e.g. "B.{seq}/MI.BH/{year}" — if not provided, use school profile format
+    // overwrite: boolean — if true, reassign even if student already has a sklNumber
+
+    // Get school profile for default format
+    const profile = await prisma.schoolProfile.findFirst();
+    const numberFormat = format || profile?.sklNumberFormat || 'B.{seq}/MI.BH/{year}';
+
+    // Fetch all graduated students ordered by name
+    const students = await prisma.student.findMany({
+      where: { isGraduated: true },
+      orderBy: { name: 'asc' },
+    });
+
+    if (students.length === 0) {
+      return res.status(400).json({ message: 'Tidak ada siswa yang berstatus lulus.' });
+    }
+
+    // Filter students that need SKL number
+    const toAssign = overwrite
+      ? students
+      : students.filter(s => !s.sklNumber);
+
+    if (toAssign.length === 0) {
+      return res.status(200).json({ 
+        message: 'Semua siswa lulus sudah memiliki nomor SKL. Gunakan opsi "Timpa" untuk meng-assign ulang.',
+        assigned: 0,
+      });
+    }
+
+    // Generate numbers sequentially
+    // Find the starting sequence — skip students that already have numbers
+    // so existing students get lower numbers than new ones
+    let seqCounter = 1;
+    const updates: { id: string; sklNumber: string }[] = [];
+
+    for (const student of toAssign) {
+      const year = student.graduationDate
+        ? new Date(student.graduationDate).getFullYear()
+        : new Date().getFullYear();
+      const seq = String(seqCounter).padStart(3, '0');
+      const sklNumber = numberFormat
+        .replace('{seq}', seq)
+        .replace('{year}', String(year));
+
+      updates.push({ id: student.id, sklNumber });
+      seqCounter++;
+    }
+
+    // Apply in transaction
+    await prisma.$transaction(
+      updates.map(u =>
+        prisma.student.update({
+          where: { id: u.id },
+          data: { sklNumber: u.sklNumber },
+        })
+      )
+    );
+
+    return res.status(200).json({
+      message: `Berhasil meng-assign ${updates.length} nomor SKL.`,
+      assigned: updates.length,
+      format: numberFormat,
+      preview: updates.slice(0, 3).map(u => u.sklNumber),
+    });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -10,6 +10,7 @@ import {
   importStudents,
   updateGraduationStatus,
   batchUpdateGraduation,
+  batchAssignSklNumbers,
 } from '../controllers/student.controller';
 import { authenticateJWT } from '../middlewares/auth.middleware';
 import { requireRoles } from '../middlewares/rbac.middleware';
@@ -36,5 +37,6 @@ router.delete('/:id', requireRoles(Role.ADMIN), deleteStudent);
 // Graduation routes
 router.patch('/:id/graduation', requireRoles(Role.ADMIN, Role.STAFF), updateGraduationStatus);
 router.post('/graduation/batch', requireRoles(Role.ADMIN, Role.STAFF), batchUpdateGraduation);
+router.post('/graduation/assign-skl-numbers', requireRoles(Role.ADMIN, Role.STAFF), batchAssignSklNumbers);
 
 export default router;

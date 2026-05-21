@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import api from '@/lib/api';
-import { School, Save, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { School, Save, Upload, Image as ImageIcon, Loader2, Hash } from 'lucide-react';
 import Image from 'next/image';
 
 interface SchoolProfile {
@@ -13,7 +13,9 @@ interface SchoolProfile {
   address: string;
   headmaster: string;
   headmasterNip: string;
+  city: string;
   logoUrl: string | null;
+  sklNumberFormat: string;
 }
 
 export default function SchoolProfilePage() {
@@ -28,6 +30,7 @@ export default function SchoolProfilePage() {
     headmasterNip: '',
     city: '',
     logoUrl: null,
+    sklNumberFormat: 'B.{seq}/MI.BH/{year}',
   });
   
   const [loading, setLoading] = useState(true);
@@ -38,12 +41,17 @@ export default function SchoolProfilePage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
+        const res = await api.get('/school');
         const data = res.data;
         setProfile({
-          ...data,
+          name: data.name || '',
           npsn: data.npsn || '',
+          address: data.address || '',
+          headmaster: data.headmaster || '',
           headmasterNip: data.headmasterNip || '',
           city: data.city || '',
+          logoUrl: data.logoUrl || null,
+          sklNumberFormat: data.sklNumberFormat || 'B.{seq}/MI.BH/{year}',
         });
         if (data.logoUrl) {
           setPreviewUrl(data.logoUrl);
@@ -82,6 +90,7 @@ export default function SchoolProfilePage() {
       formData.append('headmaster', profile.headmaster);
       formData.append('headmasterNip', profile.headmasterNip);
       formData.append('city', profile.city);
+      formData.append('sklNumberFormat', profile.sklNumberFormat);
       
       if (logoFile) {
         formData.append('logo', logoFile);
@@ -103,6 +112,11 @@ export default function SchoolProfilePage() {
     }
   };
 
+  // Preview of the SKL number format
+  const sklPreview = (profile.sklNumberFormat || '')
+    .replace('{seq}', '001')
+    .replace('{year}', String(new Date().getFullYear()));
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-slate-500 text-xs">
@@ -121,7 +135,7 @@ export default function SchoolProfilePage() {
           <School className="w-6 h-6 text-indigo-400" />
           Profil Madrasah
         </h2>
-        <p className="text-xs text-slate-450 mt-1">Kelola identitas madrasah untuk format cetak dokumen resmi (SKL & Ijazah).</p>
+        <p className="text-xs text-slate-450 mt-1">Kelola identitas madrasah untuk format cetak dokumen resmi (SKL &amp; Ijazah).</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -200,6 +214,37 @@ export default function SchoolProfilePage() {
                     placeholder="Biarkan kosong jika tidak ada"
                     className="block w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm font-mono text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-50"
                   />
+                </div>
+
+                {/* SKL Number Format */}
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Hash className="w-3 h-3 text-emerald-400" />
+                    Format Nomor SKL
+                  </label>
+                  <input
+                    type="text"
+                    value={profile.sklNumberFormat}
+                    onChange={(e) => setProfile({ ...profile, sklNumberFormat: e.target.value })}
+                    disabled={!isAdmin}
+                    placeholder="Contoh: B.{seq}/MI.BH/{year}"
+                    className="block w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm font-mono text-slate-200 focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
+                  />
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]">
+                    <span className="text-slate-500">Variabel:</span>
+                    <code className="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded font-mono">{'{seq}'}</code>
+                    <span className="text-slate-600">= nomor urut (001, 002, ...)</span>
+                    <code className="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded font-mono">{'{year}'}</code>
+                    <span className="text-slate-600">= tahun (misal: {new Date().getFullYear()})</span>
+                  </div>
+                  {sklPreview && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-[11px] text-slate-500">Preview:</span>
+                      <span className="font-mono text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-lg">
+                        {sklPreview}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

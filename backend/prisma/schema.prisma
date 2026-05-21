@@ -45,16 +45,17 @@ model User {
 }
 
 model SchoolProfile {
-  id             String   @id @default(uuid())
-  name           String
-  npsn           String?  @unique
-  address        String   @db.Text
-  headmaster     String   @map("headmaster_name")
-  headmasterNip  String?  @map("headmaster_nip")
-  city           String?  // Nama Daerah / Kabupaten
-  logoUrl        String?  @map("logo_url")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(uuid())
+  name            String
+  npsn            String?  @unique
+  address         String   @db.Text
+  headmaster      String   @map("headmaster_name")
+  headmasterNip   String?  @map("headmaster_nip")
+  city            String?  // Nama Daerah / Kabupaten
+  logoUrl         String?  @map("logo_url")
+  sklNumberFormat String?  @map("skl_number_format") // Format nomor SKL, e.g. "B.{seq}/MI.BH/{year}"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@map("school_profiles")
 }
@@ -90,6 +91,7 @@ model Student {
   isGraduated       Boolean   @default(false) @map("is_graduated")
   graduationDate    DateTime? @map("graduation_date")
   certificateNumber String?   @unique @map("certificate_number")
+  sklNumber         String?   @map("skl_number") // Nomor SKL yang ditetapkan
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

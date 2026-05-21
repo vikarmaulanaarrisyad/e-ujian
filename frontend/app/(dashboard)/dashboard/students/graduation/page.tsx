@@ -17,7 +17,10 @@ import {
   Save,
   CheckSquare,
   Printer,
-  FileText
+  FileText,
+  Hash,
+  RefreshCw,
+  ClipboardList,
 } from 'lucide-react';
 import {
   useReactTable,
@@ -38,6 +41,7 @@ interface Student {
   isGraduated: boolean;
   graduationDate: string | null;
   certificateNumber: string | null;
+  sklNumber: string | null;
 }
 
 export default function GraduationPage() {
@@ -61,11 +65,28 @@ export default function GraduationPage() {
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const [batchDate, setBatchDate] = useState('');
 
+  // Assign SKL modal state
+  const [assignSklModalOpen, setAssignSklModalOpen] = useState(false);
+  const [sklFormat, setSklFormat] = useState('');
+  const [overwriteSkl, setOverwriteSkl] = useState(false);
+
   // Fetch Students
   const { data: students = [], isLoading } = useQuery<Student[]>({
     queryKey: ['students'],
     queryFn: async () => {
       const res = await api.get('/students');
+      return res.data;
+    },
+  });
+
+  // Fetch school profile for default SKL format
+  useQuery({
+    queryKey: ['school-profile'],
+    queryFn: async () => {
+      const res = await api.get('/school');
+      if (res.data.sklNumberFormat) {
+        setSklFormat(res.data.sklNumberFormat);
+      }
       return res.data;
     },
   });
@@ -83,10 +104,12 @@ export default function GraduationPage() {
   const summary = useMemo(() => {
     const total = students.length;
     const graduated = students.filter(s => s.isGraduated).length;
+    const withSkl = students.filter(s => s.isGraduated && s.sklNumber).length;
     return {
       total,
       graduated,
       notGraduated: total - graduated,
+      withSkl,
       percentage: total > 0 ? Math.round((graduated / total) * 100) : 0,
     };
   }, [students]);
@@ -121,6 +144,27 @@ export default function GraduationPage() {
     },
   });
 
+  // Assign SKL Numbers Mutation
+  const assignSklMutation = useMutation({
+    mutationFn: async (payload: { format: string; overwrite: boolean }) => {
+      return await api.post('/students/graduation/assign-skl-numbers', payload);
+    },
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      const { assigned, preview } = res.data;
+      const previewText = preview?.length ? ` (contoh: ${preview.join(', ')})` : '';
+      showToast(`Berhasil assign ${assigned} nomor SKL${previewText}.`, 'success');
+      setAssignSklModalOpen(false);
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || 'Gagal assign nomor SKL.', 'error');
+    },
+  });
+
+  const sklPreview = sklFormat
+    .replace('{seq}', '001')
+    .replace('{year}', String(new Date().getFullYear()));
+
   const columns = useMemo<ColumnDef<Student>[]>(
     () => [
       {
@@ -149,6 +193,16 @@ export default function GraduationPage() {
               Belum Lulus
             </span>
           );
+        },
+      },
+      {
+        accessorKey: 'sklNumber',
+        header: 'No. SKL',
+        cell: (info) => {
+          const val = info.getValue() as string;
+          return val
+            ? <span className="font-mono text-[11px] text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">{val}</span>
+            : <span className="text-slate-600 text-[11px]">—</span>;
         },
       },
       {
@@ -261,27 +315,60 @@ export default function GraduationPage() {
     });
   };
 
+  const handleAssignSkl = () => {
+    if (!sklFormat.trim()) {
+      showToast('Masukkan format nomor SKL terlebih dahulu.', 'error');
+      return;
+    }
+    assignSklMutation.mutate({ format: sklFormat, overwrite: overwriteSkl });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-100 tracking-wide">Kelulusan Siswa</h2>
-          <p className="text-xs text-slate-450 mt-1">Kelola status kelulusan dan nomor seri ijazah siswa.</p>
+          <p className="text-xs text-slate-450 mt-1">Kelola status kelulusan, nomor SKL, dan cetak dokumen kelulusan.</p>
         </div>
         
-        {(user?.role === 'ADMIN' || user?.role === 'STAFF') && (
-          <button
-            onClick={() => { setBatchDate(new Date().toISOString().substring(0, 10)); setBatchModalOpen(true); }}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-emerald-600/10"
-          >
-            <CheckSquare className="w-4 h-4" />
-            Luluskan Semua
-          </button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {(user?.role === 'ADMIN' || user?.role === 'STAFF') && (
+            <>
+              {/* Assign SKL Numbers */}
+              <button
+                onClick={() => setAssignSklModalOpen(true)}
+                className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 active:bg-emerald-800 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-emerald-600/10"
+              >
+                <Hash className="w-4 h-4" />
+                Assign Nomor SKL
+              </button>
+
+              {/* Batch Print SKL */}
+              <a
+                href="/dashboard/students/graduation/print-skl/batch"
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-teal-600/10"
+              >
+                <ClipboardList className="w-4 h-4" />
+                Cetak Massal SKL
+              </a>
+
+              {/* Batch Graduate */}
+              <button
+                onClick={() => { setBatchDate(new Date().toISOString().substring(0, 10)); setBatchModalOpen(true); }}
+                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-indigo-600/10"
+              >
+                <CheckSquare className="w-4 h-4" />
+                Luluskan Semua
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md shadow-xl flex items-center gap-4">
           <div className="relative shrink-0">
             <svg className="w-14 h-14 -rotate-90" viewBox="0 0 72 72">
@@ -307,12 +394,12 @@ export default function GraduationPage() {
         </div>
 
         <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md shadow-xl flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-slate-800 border border-slate-700 shrink-0">
-            <XCircle className="w-6 h-6 text-slate-400" />
+          <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/20 shrink-0">
+            <Hash className="w-6 h-6 text-teal-400" />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Belum Lulus</p>
-            <p className="text-2xl font-extrabold text-slate-300 mt-0.5">{summary.notGraduated}</p>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">No. SKL</p>
+            <p className="text-2xl font-extrabold text-teal-400 mt-0.5">{summary.withSkl}<span className="text-sm text-slate-500 font-normal">/{summary.graduated}</span></p>
           </div>
         </div>
 
@@ -360,7 +447,7 @@ export default function GraduationPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[600px]">
+            <table className="w-full text-left border-collapse min-w-[700px]">
               <thead>
                 {table.getHeaderGroups().map((hg) => (
                   <tr key={hg.id} className="border-b border-slate-800/60 bg-slate-900/40 text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -465,7 +552,7 @@ export default function GraduationPage() {
         </div>
       )}
 
-      {/* Batch Modal */}
+      {/* Batch Graduate Modal */}
       {batchModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-slate-900 border border-emerald-900/50 rounded-2xl shadow-2xl overflow-hidden">
@@ -496,6 +583,90 @@ export default function GraduationPage() {
                 <button type="button" onClick={() => setBatchModalOpen(false)} className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold">Batal</button>
                 <button onClick={handleBatchGraduate} disabled={batchMutation.isPending || !batchDate} className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
                   {batchMutation.isPending ? 'Memproses...' : 'Ya, Luluskan Semua'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign SKL Numbers Modal */}
+      {assignSklModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-slate-900 border border-teal-900/50 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-teal-950/20">
+              <div className="flex items-center gap-2 text-teal-400">
+                <Hash className="w-5 h-5" />
+                <h3 className="font-bold text-sm">Assign Nomor SKL Otomatis</h3>
+              </div>
+              <button onClick={() => setAssignSklModalOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 text-xs text-slate-300">
+              <div className="p-4 rounded-xl bg-teal-500/5 border border-teal-500/20 text-teal-300 text-[11px] leading-relaxed">
+                Sistem akan meng-assign nomor SKL secara berurutan ke semua siswa yang berstatus <strong>LULUS</strong>, diurutkan berdasarkan nama.
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Format Nomor SKL</label>
+                <input
+                  type="text"
+                  value={sklFormat}
+                  onChange={(e) => setSklFormat(e.target.value)}
+                  placeholder="B.{seq}/MI.BH/{year}"
+                  className="block w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-slate-200 focus:outline-none focus:border-teal-500/50 transition-colors"
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                  <code className="bg-slate-800 text-teal-400 px-2 py-0.5 rounded font-mono">{'{seq}'}</code>
+                  <span className="text-slate-500">= nomor urut 3 digit</span>
+                  <code className="bg-slate-800 text-teal-400 px-2 py-0.5 rounded font-mono ml-2">{'{year}'}</code>
+                  <span className="text-slate-500">= tahun kelulusan</span>
+                </div>
+                {sklPreview && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-slate-500 text-[11px]">Preview:</span>
+                    <span className="font-mono text-sm text-teal-400 bg-teal-500/10 border border-teal-500/20 px-3 py-1 rounded-lg">{sklPreview}</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={overwriteSkl}
+                      onChange={(e) => setOverwriteSkl(e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div className={`w-10 h-5 rounded-full transition-colors ${overwriteSkl ? 'bg-teal-500' : 'bg-slate-700'}`} />
+                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${overwriteSkl ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-300">Timpa nomor yang sudah ada</p>
+                    <p className="text-[10px] text-slate-500">Jika diaktifkan, semua nomor SKL akan di-assign ulang dari urutan 001</p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-amber-400 text-[11px] flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>Siswa yang sudah memiliki nomor SKL tidak akan diubah kecuali opsi "Timpa" diaktifkan.</span>
+              </div>
+
+              <div className="flex gap-3 pt-2 border-t border-slate-800/60">
+                <button type="button" onClick={() => setAssignSklModalOpen(false)} className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold">Batal</button>
+                <button
+                  onClick={handleAssignSkl}
+                  disabled={assignSklMutation.isPending || !sklFormat.trim()}
+                  className="flex-1 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+                >
+                  {assignSklMutation.isPending
+                    ? <><RefreshCw className="w-4 h-4 animate-spin" /> Memproses...</>
+                    : <><Hash className="w-4 h-4" /> Assign Nomor SKL</>
+                  }
                 </button>
               </div>
             </div>

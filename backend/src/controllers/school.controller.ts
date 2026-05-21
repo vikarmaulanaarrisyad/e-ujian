@@ -37,15 +37,13 @@ export const getSchoolProfile = async (req: Request, res: Response, next: NextFu
 
 export const updateSchoolProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, npsn, address, headmaster, headmasterNip, city } = req.body;
+    const { name, npsn, address, headmaster, headmasterNip, city, sklNumberFormat } = req.body;
     let profile = await prisma.schoolProfile.findFirst();
 
     let logoUrl = profile?.logoUrl;
     
     // If a new file is uploaded
     if (req.file) {
-      // We will save the relative path from the server root.
-      // E.g., /uploads/logo-1234.png
       logoUrl = `/uploads/${req.file.filename}`;
     }
 
@@ -60,6 +58,7 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
           headmaster: headmaster || profile.headmaster,
           headmasterNip: headmasterNip || profile.headmasterNip,
           logoUrl,
+          sklNumberFormat: sklNumberFormat !== undefined ? (sklNumberFormat || null) : profile.sklNumberFormat,
         },
       });
     } else {
@@ -72,6 +71,7 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
           headmaster: headmaster || DEFAULT_SCHOOL.headmaster,
           headmasterNip: headmasterNip || DEFAULT_SCHOOL.headmasterNip,
           logoUrl,
+          sklNumberFormat: sklNumberFormat || null,
         },
       });
     }

@@ -61,6 +61,9 @@ export default function PrintSKLPage() {
     return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
+  // Determine SKL number: use assigned sklNumber or fallback placeholder
+  const sklNumber = student.sklNumber || `___/MI.BH/${new Date().getFullYear()}`;
+
   return (
     <>
       <style dangerouslySetInnerHTML={{__html: `
@@ -110,7 +113,7 @@ export default function PrintSKLPage() {
       {/* Floating back button for non-print view */}
       <div className="fixed bottom-6 right-6 no-print">
         <button onClick={() => window.close()} className="px-5 py-2.5 bg-slate-800 text-white rounded-xl shadow-xl hover:bg-slate-700 transition font-sans text-sm">
-          Tutup & Kembali
+          Tutup &amp; Kembali
         </button>
       </div>
 
@@ -144,7 +147,7 @@ export default function PrintSKLPage() {
         {/* Title */}
         <div className="text-center mb-8">
           <h3 className="text-xl font-bold uppercase underline mb-1">Surat Keterangan Lulus</h3>
-          <p className="text-sm">Nomor: B.________/MI.BH/____/{new Date().getFullYear()}</p>
+          <p className="text-sm">Nomor: {sklNumber}</p>
         </div>
 
         {/* Content */}
