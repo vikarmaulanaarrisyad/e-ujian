@@ -19,7 +19,8 @@ import {
   BookMarked,
   AlertTriangle,
   Award,
-  Calendar
+  Calendar,
+  Shield
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -40,6 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Profil Madrasah', href: '/dashboard/school', icon: School, roles: ['ADMIN'] },
     { name: 'Tahun Ajaran', href: '/dashboard/academic-years', icon: Calendar, roles: ['ADMIN'] },
+    { name: 'Manajemen Akses', href: '/dashboard/users', icon: Shield, roles: ['ADMIN'] },
     { name: 'Data Siswa', href: '/dashboard/students', icon: Users, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Mata Pelajaran', href: '/dashboard/subjects', icon: BookMarked, roles: ['ADMIN'] },
     { name: 'Input Nilai Rapor', href: '/dashboard/grades/reports', icon: BookOpen, roles: ['ADMIN', 'GURU', 'STAFF'] },
@@ -62,7 +64,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-100 font-sans">
+    <div className="h-screen flex bg-slate-950 text-slate-100 font-sans overflow-hidden">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 

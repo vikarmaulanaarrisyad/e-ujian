@@ -1,226 +1,275 @@
 'use client';
 
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
+import api from '@/lib/api';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 import {
   Users,
-  BookOpen,
   GraduationCap,
   Award,
-  ArrowRight,
-  School,
-  MapPin,
+  BookOpen,
   Calendar,
-  Briefcase
+  Loader2,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
-import Link from 'next/link';
+
+interface DashboardStats {
+  activeAcademicYear: {
+    year: string;
+    semester: 'ODD' | 'EVEN';
+  } | null;
+  students: {
+    total: number;
+    male: number;
+    female: number;
+  };
+  graduation: {
+    graduated: number;
+    notGraduated: number;
+    passRate: number;
+  };
+  averages: {
+    report: number;
+    exam: number;
+  };
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { showToast } = useToast();
+  
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const { data: students = [], isLoading: isLoadingStudents } = useQuery({
-    queryKey: ['students'],
-    queryFn: async () => {
-      const res = await api.get('/students');
-      return res.data;
-    },
-  });
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await api.get('/dashboard/stats');
+        setStats(res.data);
+      } catch (error) {
+        showToast('Gagal memuat statistik dashboard.', 'error');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
 
-  const { data: recapData, isLoading: isLoadingRecap } = useQuery({
-    queryKey: ['recap'],
-    queryFn: async () => {
-      const res = await api.get('/grades/recap');
-      return res.data;
-    },
-  });
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh]">
+        <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-4" />
+        <p className="text-slate-400 font-medium animate-pulse">Menyiapkan Dashboard Anda...</p>
+      </div>
+    );
+  }
 
-  const totalStudents = students.length;
-  const averageRecapScore = recapData?.recap?.length > 0
-    ? (recapData.recap.reduce((sum: number, student: any) => sum + student.averageFinalScore, 0) / recapData.recap.length).toFixed(2)
-    : 'N/A';
-
-  const stats = [
-    {
-      name: 'Total Siswa (Kelas 6)',
-      value: isLoadingStudents ? '...' : totalStudents,
-      description: 'Siswa terdaftar aktif tahun ini',
-      icon: Users,
-      color: 'from-blue-500 to-indigo-500',
-      shadow: 'shadow-blue-500/10'
-    },
-    {
-      name: 'Mata Pelajaran',
-      value: '13',
-      description: 'Kelompok A, B, dan C',
-      icon: BookOpen,
-      color: 'from-purple-500 to-pink-500',
-      shadow: 'shadow-purple-500/10'
-    },
-    {
-      name: 'Rata-rata Nilai Akhir',
-      value: isLoadingRecap ? '...' : averageRecapScore,
-      description: 'Dari total rekapitulasi kelulusan',
-      icon: Award,
-      color: 'from-emerald-500 to-teal-500',
-      shadow: 'shadow-emerald-500/10'
-    },
-    {
-      name: 'Pembobotan Aktif',
-      value: `${recapData?.weight?.reportPercentage || 60}% : ${recapData?.weight?.examPercentage || 40}%`,
-      description: 'Rapor vs Ujian Madrasah',
-      icon: GraduationCap,
-      color: 'from-amber-500 to-orange-500',
-      shadow: 'shadow-amber-500/10'
-    },
+  // Chart Data preparation
+  const genderData = [
+    { name: 'Laki-laki', value: stats?.students.male || 0, color: '#3b82f6' }, // Blue
+    { name: 'Perempuan', value: stats?.students.female || 0, color: '#ec4899' }, // Pink
   ];
 
+  const graduationData = [
+    { name: 'Lulus', value: stats?.graduation.graduated || 0, color: '#10b981' }, // Emerald
+    { name: 'Belum Lulus', value: stats?.graduation.notGraduated || 0, color: '#f43f5e' }, // Rose
+  ];
+
+  const averageData = [
+    { name: 'Rata-rata Rapor', score: stats?.averages.report || 0 },
+    { name: 'Rata-rata Ujian', score: stats?.averages.exam || 0 },
+  ];
+
+  const isAcademicYearActive = stats?.activeAcademicYear !== null;
+  const currentSemester = stats?.activeAcademicYear?.semester === 'ODD' ? 'Ganjil' : 'Genap';
+
   return (
-    <div className="space-y-8">
-      {/* Welcome Banner */}
-      <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-slate-900/40 border border-indigo-500/10 p-8 md:p-10 shadow-2xl backdrop-blur-md">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl -z-10 pointer-events-none" />
-        <div className="absolute bottom-0 right-10 w-60 h-60 bg-purple-500/10 rounded-full blur-3xl -z-10 pointer-events-none" />
+    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+      
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 bg-slate-900/40 p-6 sm:p-8 rounded-3xl border border-slate-800/80 backdrop-blur-md shadow-2xl relative overflow-hidden">
+        {/* Abstract Background Decoration */}
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none"></div>
 
-        <div className="max-w-2xl">
-          <span className="px-3.5 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase bg-indigo-500/15 border border-indigo-500/20 text-indigo-400">
-            Selamat Datang di SIPANMU
-          </span>
-          <h2 className="text-2xl md:text-3xl font-extrabold text-white mt-4 leading-tight">
-            Halo, {user?.name}!
-          </h2>
-          <p className="text-slate-400 text-sm mt-3.5 leading-relaxed">
-            Anda login sebagai <span className="text-indigo-400 font-semibold">{user?.role}</span>. Mulai kelola data siswa, entri nilai rapor semesters 7-11, entri nilai ujian madrasah, dan kalkulasi rekapitulasi kelulusan secara real-time.
+        <div className="relative z-10">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
+            Selamat Datang, {user?.name}! 👋
+          </h1>
+          <p className="text-sm sm:text-base text-slate-400 mt-2 max-w-2xl">
+            Sistem Informasi Pengolahan Nilai & Ijazah Madrasah Ibtidaiyah. Kelola data nilai siswa secara efisien dan rapi.
           </p>
-          <div className="flex flex-wrap gap-4 mt-6">
-            <Link 
-              href="/dashboard/students"
-              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-xs transition-all duration-205 shadow-md shadow-indigo-600/10 flex items-center gap-2 group cursor-pointer"
-            >
-              <span>Kelola Siswa</span>
-              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-            <Link
-              href="/dashboard/grades/recap"
-              className="px-5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-350 font-semibold text-xs transition-all duration-200 flex items-center gap-2 cursor-pointer"
-            >
-              <span>Lihat Rekap Kelulusan</span>
-            </Link>
-          </div>
+        </div>
+
+        <div className="relative z-10 flex flex-col items-start md:items-end mt-4 md:mt-0">
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Tahun Ajaran Aktif</p>
+          {isAcademicYearActive ? (
+            <div className="flex items-center gap-2 bg-indigo-950/40 px-4 py-2 rounded-xl border border-indigo-900/50 shadow-inner">
+              <Calendar className="w-5 h-5 text-indigo-400" />
+              <div>
+                <p className="text-sm font-bold text-indigo-100">{stats.activeAcademicYear!.year}</p>
+                <p className="text-[10px] text-indigo-300">Semester {currentSemester}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-rose-950/40 px-4 py-2 rounded-xl border border-rose-900/50 shadow-inner">
+              <AlertTriangle className="w-5 h-5 text-rose-400" />
+              <p className="text-xs font-bold text-rose-300">Belum ada Tahun Ajaran Aktif</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Grid Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div 
-              key={stat.name} 
-              className={`bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-sm shadow-xl ${stat.shadow} transition-all duration-300 hover:-translate-y-1 hover:border-slate-800`}
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{stat.name}</p>
-                  <p className="text-2xl font-bold text-white mt-3.5 tracking-tight">{stat.value}</p>
-                </div>
-                <div className={`p-3.5 rounded-xl bg-gradient-to-tr ${stat.color} text-white shadow-lg`}>
-                  <Icon className="w-5 h-5" />
-                </div>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-4 leading-normal font-medium">{stat.description}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Section Grid: School Profile & Action Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-7 backdrop-blur-sm shadow-xl flex flex-col justify-between">
+      {/* Top Statistic Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        
+        <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800/80 backdrop-blur-md shadow-xl flex items-center gap-4 transition-transform hover:-translate-y-1 duration-300">
+          <div className="p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20 text-blue-400">
+            <Users className="w-8 h-8" />
+          </div>
           <div>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                <School className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-slate-200">Profil Madrasah</h3>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-              <div className="space-y-4">
-                <div className="flex gap-3">
-                  <School className="w-4.5 h-4.5 text-slate-500 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Nama Madrasah</span>
-                    <span className="text-slate-300 font-semibold">MI Bustanul Huda Dawuhan</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <MapPin className="w-4.5 h-4.5 text-slate-500 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Alamat</span>
-                    <span className="text-slate-400 leading-relaxed block text-xs">Jl. Kyai Gede No. 45, Dawuhan, Bondowoso</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex gap-3">
-                  <Briefcase className="w-4.5 h-4.5 text-slate-500 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Kepala Madrasah</span>
-                    <span className="text-slate-300 font-semibold">H. Ahmad Fauzi, S.Pd.I</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Calendar className="w-4.5 h-4.5 text-slate-500 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">NIP</span>
-                    <span className="text-slate-400 text-xs">197508122005011002</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-slate-800/60 mt-6 pt-5 flex items-center justify-between text-xs text-slate-500">
-            <span>NPSN: <span className="text-slate-400 font-bold">60722341</span></span>
-            <span>Status Akreditasi: <span className="text-emerald-450 font-bold">A (Unggul)</span></span>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Siswa</p>
+            <h3 className="text-3xl font-extrabold text-slate-100 mt-1">{stats?.students.total}</h3>
           </div>
         </div>
 
-        <div className="bg-gradient-to-b from-indigo-950/20 to-purple-950/10 border border-slate-800/80 rounded-2xl p-7 backdrop-blur-sm shadow-xl flex flex-col justify-between">
+        <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800/80 backdrop-blur-md shadow-xl flex items-center gap-4 transition-transform hover:-translate-y-1 duration-300">
+          <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 text-emerald-400">
+            <GraduationCap className="w-8 h-8" />
+          </div>
           <div>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
-                <BookOpen className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-slate-200">Panduan Pengolahan</h3>
-            </div>
-
-            <ul className="space-y-4 text-xs text-slate-400">
-              <li className="flex gap-2.5 items-start">
-                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
-                <span>Pastikan data siswa telah diimpor/diupdate dengan lengkap sebelum menginput nilai.</span>
-              </li>
-              <li className="flex gap-2.5 items-start">
-                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
-                <span>Pilih Mata Pelajaran pada dropdown halaman input nilai untuk memuat grid input.</span>
-              </li>
-              <li className="flex gap-2.5 items-start">
-                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
-                <span>Gunakan fitur <strong>Impor Excel</strong> untuk mempercepat input nilai secara massal.</span>
-              </li>
-            </ul>
-          </div>
-
-          <div className="mt-6 p-4 rounded-xl bg-indigo-950/30 border border-indigo-900/30 text-[11px] text-indigo-300">
-            Rata-rata Nilai Rapor dihitung dari Semester 7 sampai 11 (Kelas 4 Ganjil s/d Kelas 6 Ganjil).
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Telah Lulus</p>
+            <h3 className="text-3xl font-extrabold text-slate-100 mt-1">{stats?.graduation.graduated}</h3>
           </div>
         </div>
+
+        <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800/80 backdrop-blur-md shadow-xl flex items-center gap-4 transition-transform hover:-translate-y-1 duration-300">
+          <div className="p-4 bg-amber-500/10 rounded-2xl border border-amber-500/20 text-amber-400">
+            <Award className="w-8 h-8" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Rata-rata Kelulusan</p>
+            <div className="flex items-center gap-2 mt-1">
+              <h3 className="text-3xl font-extrabold text-slate-100">{stats?.graduation.passRate.toFixed(1)}%</h3>
+              {stats && stats.graduation.passRate > 50 ? (
+                <TrendingUp className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <TrendingDown className="w-4 h-4 text-rose-500" />
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800/80 backdrop-blur-md shadow-xl flex items-center gap-4 transition-transform hover:-translate-y-1 duration-300">
+          <div className="p-4 bg-purple-500/10 rounded-2xl border border-purple-500/20 text-purple-400">
+            <BookOpen className="w-8 h-8" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Rata-rata Nilai</p>
+            <h3 className="text-3xl font-extrabold text-slate-100 mt-1">{stats?.averages.exam.toFixed(1)}</h3>
+          </div>
+        </div>
+
       </div>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Left Chart: Status Kelulusan (Pie) */}
+        <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80 backdrop-blur-md shadow-xl flex flex-col h-[400px]">
+          <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider mb-6">Status Kelulusan Siswa</h3>
+          <div className="flex-1 w-full min-h-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={graduationData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={80}
+                  outerRadius={120}
+                  paddingAngle={5}
+                  dataKey="value"
+                  stroke="none"
+                >
+                  {graduationData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '1rem', color: '#f1f5f9' }}
+                  itemStyle={{ fontWeight: 'bold' }}
+                />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Right Chart: Rata-rata Nilai (Bar) & Demografi (Pie) */}
+        <div className="flex flex-col gap-6">
+          
+          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80 backdrop-blur-md shadow-xl flex-1 flex flex-col min-h-[190px]">
+            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider mb-2">Demografi Siswa (Gender)</h3>
+            <div className="flex-1 w-full flex items-center justify-center mt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={genderData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={60}
+                    dataKey="value"
+                    stroke="none"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {genderData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '1rem' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80 backdrop-blur-md shadow-xl flex-1 flex flex-col min-h-[190px]">
+            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider mb-4">Perbandingan Nilai Madrasah</h3>
+            <div className="flex-1 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={averageData} layout="vertical" margin={{ top: 0, right: 30, left: 30, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#1e293b" />
+                  <XAxis type="number" domain={[0, 100]} stroke="#64748b" tick={{ fill: '#64748b', fontSize: 10 }} />
+                  <YAxis dataKey="name" type="category" stroke="#64748b" tick={{ fill: '#94a3b8', fontSize: 11 }} width={100} />
+                  <RechartsTooltip 
+                    cursor={{ fill: '#1e293b', opacity: 0.4 }}
+                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '0.5rem', color: '#f1f5f9' }} 
+                  />
+                  <Bar dataKey="score" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={24} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
     </div>
   );
 }

@@ -193,7 +193,7 @@ export default function PrintSKLPage() {
         {/* Signature */}
         <div className="mt-20 flex justify-end">
           <div className="w-64 text-center">
-            <p className="mb-1">Dawuhan, {formatDate(student.graduationDate || new Date().toISOString())}</p>
+            <p className="mb-1">{schoolProfile.city || 'Bondowoso'}, {formatDate(student.graduationDate || new Date().toISOString())}</p>
             <p className="mb-24">Kepala Madrasah,</p>
             <p className="font-bold underline uppercase">{schoolProfile.headmaster}</p>
             <p>NIP. {schoolProfile.headmasterNip || '-'}</p>

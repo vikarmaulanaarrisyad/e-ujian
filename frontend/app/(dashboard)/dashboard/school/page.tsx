@@ -26,6 +26,7 @@ export default function SchoolProfilePage() {
     address: '',
     headmaster: '',
     headmasterNip: '',
+    city: '',
     logoUrl: null,
   });
   
@@ -75,6 +76,7 @@ export default function SchoolProfilePage() {
       formData.append('address', profile.address);
       formData.append('headmaster', profile.headmaster);
       formData.append('headmasterNip', profile.headmasterNip);
+      formData.append('city', profile.city);
       
       if (logoFile) {
         formData.append('logo', logoFile);
@@ -143,6 +145,17 @@ export default function SchoolProfilePage() {
                     type="text"
                     value={profile.npsn}
                     onChange={(e) => setProfile({ ...profile, npsn: e.target.value })}
+                    disabled={!isAdmin}
+                    className="block w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Kota / Kabupaten</label>
+                  <input
+                    type="text"
+                    value={profile.city}
+                    onChange={(e) => setProfile({ ...profile, city: e.target.value })}
                     disabled={!isAdmin}
                     className="block w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-50"
                   />

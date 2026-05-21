@@ -51,6 +51,7 @@ model SchoolProfile {
   address        String   @db.Text
   headmaster     String   @map("headmaster_name")
   headmasterNip  String?  @map("headmaster_nip")
+  city           String?  // Nama Daerah / Kabupaten
   logoUrl        String?  @map("logo_url")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

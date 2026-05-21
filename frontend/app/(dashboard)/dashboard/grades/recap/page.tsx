@@ -161,7 +161,8 @@ export default function GradeRecapPage() {
       
       // Draw Signatures
       doc.setFont('times', 'normal');
-      doc.text(`Bondowoso, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth - 20, signY, { align: 'right' });
+      const cityName = data?.schoolProfile?.city || 'Bondowoso';
+      doc.text(`${cityName}, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth - 20, signY, { align: 'right' });
       doc.setFont('times', 'bold');
       doc.text('Kepala Madrasah,', pageWidth - 50, signY + 6, { align: 'center' });
       

@@ -188,7 +188,7 @@ export default function PrintIjazahPage() {
           </div>
           
           <div className="w-64 text-left">
-            <p className="mb-1">Dawuhan, {formatDate(student.graduationDate || new Date().toISOString())}</p>
+            <p className="mb-1">{schoolProfile.city}, {formatDate(student.graduationDate || new Date().toISOString())}</p>
             <p className="mb-24">Kepala Madrasah,</p>
             <p className="font-bold underline uppercase">{schoolProfile.headmaster}</p>
             <p>NIP. {schoolProfile.headmasterNip || '-'}</p>

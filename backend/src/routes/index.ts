@@ -7,6 +7,8 @@ import backupRouter from './backup.routes';
 import documentRouter from './document.routes';
 import schoolRouter from './school.routes';
 import academicYearRouter from './academicYear.routes';
+import userRouter from './user.routes';
+import dashboardRouter from './dashboard.routes';
 
 const router = Router();
 
@@ -18,5 +20,7 @@ router.use('/backup', backupRouter);
 router.use('/documents', documentRouter);
 router.use('/school', schoolRouter);
 router.use('/academic-years', academicYearRouter);
+router.use('/users', userRouter);
+router.use('/dashboard', dashboardRouter);
 
 export default router;
