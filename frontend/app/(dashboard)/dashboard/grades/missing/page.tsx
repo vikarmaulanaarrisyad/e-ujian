@@ -59,12 +59,16 @@ const SEMESTER_LABELS: Record<number, string> = {
   9: 'Smt 9',
   10: 'Smt 10',
   11: 'Smt 11',
+  12: 'Smt 12',
 };
+
+const ALL_SEMESTERS = [7, 8, 9, 10, 11, 12];
 
 function CircularProgress({ pct, color }: { pct: number; color: string }) {
   const radius = 28;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (pct / 100) * circumference;
+  const safePct = isNaN(pct) || !isFinite(pct) ? 0 : Math.max(0, Math.min(100, pct));
+  const offset = circumference - (safePct / 100) * circumference;
   return (
     <svg className="w-16 h-16 -rotate-90" viewBox="0 0 72 72">
       <circle cx="36" cy="36" r={radius} fill="none" stroke="currentColor" strokeWidth="6" className="text-slate-800" />
@@ -162,7 +166,7 @@ export default function MissingGradesPage() {
         <div>
           <h2 className="text-xl font-bold text-slate-100 tracking-wide">Nilai Belum Masuk</h2>
           <p className="text-xs text-slate-450 mt-1">
-            Pantau siswa yang nilainya belum diinput — rapor (Smt 7–11) dan ujian madrasah.
+            Pantau siswa yang nilainya belum diinput — rapor (Smt 7–12) dan ujian madrasah.
           </p>
         </div>
         {data?.academicYear && (
@@ -354,7 +358,7 @@ export default function MissingGradesPage() {
                       className="pl-9 pr-8 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors appearance-none cursor-pointer"
                     >
                       <option value="">Semua Semester</option>
-                      {[7, 8, 9, 10, 11].map((s) => (
+                      {ALL_SEMESTERS.map((s) => (
                         <option key={s} value={s}>Semester {s}</option>
                       ))}
                     </select>
@@ -431,7 +435,7 @@ export default function MissingGradesPage() {
                               <td className="py-3 px-4 text-center">
                                 <span
                                   className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-extrabold ${
-                                    item.missingSemesters.length === 5
+                                    item.missingSemesters.length >= ALL_SEMESTERS.length
                                       ? 'bg-rose-900/40 text-rose-400 border border-rose-800/50'
                                       : 'bg-orange-900/30 text-orange-400 border border-orange-800/40'
                                   }`}

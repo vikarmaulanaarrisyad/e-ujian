@@ -220,6 +220,16 @@ export default function AlumniPage() {
             <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             Memuat data...
           </div>
+        ) : table.getRowModel().rows.length === 0 ? (
+          <div className="py-20 text-center">
+            <GraduationCap className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+            <p className="text-sm font-semibold text-slate-400">Belum Ada Data Alumni</p>
+            <p className="text-xs text-slate-600 mt-2 max-w-sm mx-auto">
+              {globalFilter
+                ? 'Tidak ada alumni yang cocok dengan pencarian.'
+                : 'Belum ada siswa yang diarsipkan. Gunakan tombol "Arsip Lulusan" di halaman Kelulusan untuk memindahkan siswa lulus ke sini.'}
+            </p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[700px]">

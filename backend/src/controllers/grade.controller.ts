@@ -1246,7 +1246,7 @@ export const getMissingGrades = async (req: Request, res: Response, next: NextFu
     }
 
     const [students, subjects, existingReportGrades, existingExamGrades] = await Promise.all([
-      prisma.student.findMany({ orderBy: { name: 'asc' } }),
+      prisma.student.findMany({ where: { isAlumni: false }, orderBy: { name: 'asc' } }),
       prisma.subject.findMany({ orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }] }),
       prisma.reportGrade.findMany({
         where: { academicYearId: activeYear.id },
