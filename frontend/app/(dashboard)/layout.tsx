@@ -20,7 +20,8 @@ import {
   AlertTriangle,
   Award,
   Calendar,
-  Shield
+  Shield,
+  ClipboardList,
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -51,6 +52,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Nilai Belum Masuk', href: '/dashboard/grades/missing', icon: AlertTriangle, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Kelulusan Siswa', href: '/dashboard/students/graduation', icon: Award, roles: ['ADMIN', 'STAFF'] },
     { name: 'Pengaturan Bobot', href: '/dashboard/settings', icon: Settings, roles: ['ADMIN'] },
+    { name: 'Riwayat Aktivitas', href: '/dashboard/activity-logs', icon: ClipboardList, roles: ['ADMIN'] },
   ];
 
   const filteredNav = navigation.filter(item => item.roles.includes(user?.role || ''));

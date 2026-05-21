@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import ExcelJS from 'exceljs';
 import prisma from '../db';
+import { logActivity } from '../lib/activityLog';
 import { updateGradeWeightSchema, saveReportGradesSchema, saveExamGradesSchema } from '../validators/grade.validator';
 import fs from 'fs';
 
@@ -218,6 +219,8 @@ export const saveReportGrades = async (req: Request, res: Response, next: NextFu
         })
       )
     );
+
+    logActivity({ req, action: 'SAVE_REPORT_GRADES', entity: 'ReportGrade', description: `Menyimpan ${grades.length} nilai rapor (TP: ${activeYear.year})` });
 
     return res.status(200).json({ message: 'Report card grades saved successfully' });
   } catch (error) {
@@ -615,6 +618,8 @@ export const saveExamGrades = async (req: Request, res: Response, next: NextFunc
       )
     );
 
+    logActivity({ req, action: 'SAVE_EXAM_GRADES', entity: 'ExamGrade', description: `Menyimpan ${grades.length} nilai ujian (TP: ${activeYear.year})` });
+
     return res.status(200).json({ message: 'Exam grades saved successfully' });
   } catch (error) {
     next(error);
@@ -844,6 +849,8 @@ export const importExamGrades = async (req: Request, res: Response, next: NextFu
     if (dbErrors.length > 0) {
       return res.status(400).json({ message: 'Import failed', errors: dbErrors });
     }
+
+    logActivity({ req, action: 'IMPORT_EXAM_GRADES', entity: 'ExamGrade', description: `Mengimpor ${savedCount} nilai ujian mapel: ${subject.name}` });
 
     return res.status(200).json({
       message: `Successfully imported ${savedCount} exam grades.`,

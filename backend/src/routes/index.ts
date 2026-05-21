@@ -9,6 +9,7 @@ import schoolRouter from './school.routes';
 import academicYearRouter from './academicYear.routes';
 import userRouter from './user.routes';
 import dashboardRouter from './dashboard.routes';
+import activityLogRouter from './activityLog.routes';
 
 const router = Router();
 
@@ -22,5 +23,7 @@ router.use('/school', schoolRouter);
 router.use('/academic-years', academicYearRouter);
 router.use('/users', userRouter);
 router.use('/dashboard', dashboardRouter);
+router.use('/activity-logs', activityLogRouter);
 
 export default router;
+

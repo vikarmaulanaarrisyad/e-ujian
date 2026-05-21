@@ -6,6 +6,7 @@ import { Gender } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 import AdmZip from 'adm-zip';
+import { logActivity } from '../lib/activityLog';
 
 // Get all students
 export const getAllStudents = async (req: Request, res: Response, next: NextFunction) => {
@@ -83,6 +84,8 @@ export const createStudent = async (req: Request, res: Response, next: NextFunct
       data: validation.data,
     });
 
+    logActivity({ req, action: 'CREATE_STUDENT', entity: 'Student', entityId: student.id, description: `Menambahkan siswa baru: ${student.name} (NIS: ${student.nis})` });
+
     return res.status(201).json({
       message: 'Student created successfully',
       student,
@@ -130,6 +133,8 @@ export const updateStudent = async (req: Request, res: Response, next: NextFunct
       data: validation.data,
     });
 
+    logActivity({ req, action: 'UPDATE_STUDENT', entity: 'Student', entityId: id, description: `Memperbarui data siswa: ${student.name} (NIS: ${student.nis})` });
+
     return res.status(200).json({
       message: 'Student updated successfully',
       student: updatedStudent,
@@ -151,6 +156,8 @@ export const deleteStudent = async (req: Request, res: Response, next: NextFunct
     await prisma.student.delete({
       where: { id },
     });
+
+    logActivity({ req, action: 'DELETE_STUDENT', entity: 'Student', entityId: id, description: `Menghapus data siswa: ${student.name} (NIS: ${student.nis})` });
 
     return res.status(200).json({ message: 'Student deleted successfully' });
   } catch (error) {
@@ -432,6 +439,8 @@ export const importStudents = async (req: Request, res: Response, next: NextFunc
       return res.status(400).json({ message: 'Import failed due to duplicate database entries', errors: dbErrors });
     }
 
+    logActivity({ req, action: 'IMPORT_STUDENTS', entity: 'Student', description: `Mengimpor ${successCount} data siswa dari Excel` });
+
     return res.status(200).json({
       message: `Successfully imported ${successCount} students.`,
     });
@@ -470,6 +479,8 @@ export const updateGraduationStatus = async (req: Request, res: Response, next: 
       },
     });
 
+    logActivity({ req, action: 'UPDATE_GRADUATION', entity: 'Student', entityId: id, description: `Memperbarui status kelulusan ${student.name}: ${isGraduated ? 'Lulus' : 'Tidak Lulus'}` });
+
     return res.status(200).json({ message: 'Status kelulusan diperbarui', student: updated });
   } catch (error) {
     next(error);
@@ -492,6 +503,8 @@ export const batchUpdateGraduation = async (req: Request, res: Response, next: N
         graduationDate: graduationDate ? new Date(graduationDate) : null,
       },
     });
+
+    logActivity({ req, action: 'BATCH_UPDATE_GRADUATION', entity: 'Student', description: `Batch update kelulusan ${studentIds.length} siswa menjadi: ${isGraduated ? 'Lulus' : 'Tidak Lulus'}` });
 
     return res.status(200).json({ message: `${studentIds.length} siswa berhasil diperbarui status kelulusannya.` });
   } catch (error) {
@@ -560,6 +573,8 @@ export const batchAssignSklNumbers = async (req: Request, res: Response, next: N
         })
       )
     );
+
+    logActivity({ req, action: 'ASSIGN_SKL_NUMBERS', entity: 'Student', description: `Meng-assign ${updates.length} nomor SKL dengan format: ${numberFormat}`, metadata: { assigned: updates.length, format: numberFormat } });
 
     return res.status(200).json({
       message: `Berhasil meng-assign ${updates.length} nomor SKL.`,

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../db';
 import fs from 'fs';
+import { logActivity } from '../lib/activityLog';
 
 // ==========================================
 // BACKUP EXPORT
@@ -64,6 +65,7 @@ export const exportBackup = async (req: Request, res: Response, next: NextFuncti
 
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    logActivity({ req, action: 'EXPORT_BACKUP', entity: 'Backup', description: `Mengunduh backup database: ${fileName}`, metadata: { fileName, totalRecords: backup.metadata.totalRecords } });
     return res.status(200).json(backup);
   } catch (error) {
     next(error);
@@ -152,6 +154,8 @@ export const importBackup = async (req: Request, res: Response, next: NextFuncti
     );
 
     fs.unlinkSync(filePath);
+
+    logActivity({ req, action: 'IMPORT_BACKUP', entity: 'Backup', description: `Me-restore database dari file backup (dibuat: ${backup.metadata?.createdAt})`, metadata: { restoredCounts: { students: students.length, reportGrades: reportGrades.length, examGrades: examGrades.length } } });
 
     return res.status(200).json({
       message: 'Database berhasil di-restore dari file backup.',

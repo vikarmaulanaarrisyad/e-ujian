@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import prisma from '../db';
 import { env } from '../config/env';
 import { loginSchema } from '../validators/auth.validator';
+import { logActivity } from '../lib/activityLog';
 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -36,7 +37,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       { expiresIn: env.JWT_EXPIRES_IN as any }
     );
 
-    return res.status(200).json({
+    const response = res.status(200).json({
       message: 'Login successful',
       token,
       user: {
@@ -46,6 +47,12 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         role: user.role,
       },
     });
+
+    // Log login — set req.user manually karena middleware belum dijalankan
+    req.user = { id: user.id, username: user.username, name: user.name, role: user.role };
+    logActivity({ req, action: 'LOGIN', entity: 'Auth', description: `${user.name} (${user.role}) berhasil login` });
+
+    return response;
   } catch (error) {
     next(error);
   }

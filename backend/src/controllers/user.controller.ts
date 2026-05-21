@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import prisma from '../db';
 import bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
+import { logActivity } from '../lib/activityLog';
 
 export const getUsers = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -48,6 +49,8 @@ export const createUser = async (req: Request, res: Response, next: NextFunction
       },
     });
 
+    logActivity({ req, action: 'CREATE_USER', entity: 'User', entityId: user.id, description: `Menambahkan akun pengguna baru: ${name} (${role})` });
+
     return res.status(201).json({ message: 'Pengguna berhasil ditambahkan.', data: user });
   } catch (error) {
     next(error);
@@ -91,6 +94,12 @@ export const updateUser = async (req: Request, res: Response, next: NextFunction
       },
     });
 
+    const changes = [];
+    if (name) changes.push(`nama: ${name}`);
+    if (role) changes.push(`role: ${role}`);
+    if (password) changes.push('password diperbarui');
+    logActivity({ req, action: 'UPDATE_USER', entity: 'User', entityId: id, description: `Memperbarui akun ${targetUser.name}${changes.length ? ': ' + changes.join(', ') : ''}` });
+
     return res.status(200).json({ message: 'Pengguna berhasil diperbarui.', data: updated });
   } catch (error) {
     next(error);
@@ -112,6 +121,8 @@ export const deleteUser = async (req: Request, res: Response, next: NextFunction
     }
 
     await prisma.user.delete({ where: { id } });
+
+    logActivity({ req, action: 'DELETE_USER', entity: 'User', entityId: id, description: `Menghapus akun pengguna: ${targetUser.name} (${targetUser.role})` });
 
     return res.status(200).json({ message: 'Pengguna berhasil dihapus.' });
   } catch (error) {

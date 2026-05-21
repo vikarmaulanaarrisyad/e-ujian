@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../db';
 import { SemesterType } from '@prisma/client';
+import { logActivity } from '../lib/activityLog';
 
 export const getAllAcademicYears = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -53,6 +54,8 @@ export const createAcademicYear = async (req: Request, res: Response, next: Next
       },
     });
 
+    logActivity({ req, action: 'CREATE_ACADEMIC_YEAR', entity: 'AcademicYear', entityId: academicYear.id, description: `Membuat tahun ajaran baru: ${year} - ${semester}` });
+
     return res.status(201).json({
       message: 'Tahun Ajaran berhasil dibuat.',
       data: academicYear,
@@ -84,6 +87,8 @@ export const activateAcademicYear = async (req: Request, res: Response, next: Ne
         data: { isActive: true },
       }),
     ]);
+
+    logActivity({ req, action: 'ACTIVATE_ACADEMIC_YEAR', entity: 'AcademicYear', entityId: id, description: `Mengaktifkan tahun ajaran: ${target.year} - ${target.semester}` });
 
     return res.status(200).json({ message: 'Tahun Ajaran berhasil diaktifkan.' });
   } catch (error) {
@@ -128,6 +133,8 @@ export const updateGradeWeight = async (req: Request, res: Response, next: NextF
       });
     }
 
+    logActivity({ req, action: 'UPDATE_GRADE_WEIGHT', entity: 'GradeWeight', entityId: id, description: `Memperbarui bobot nilai TP ${academicYear.year}: Rapor ${reportPercentage}%, Ujian ${examPercentage}%` });
+
     return res.status(200).json({
       message: 'Bobot kelulusan berhasil diperbarui.',
       data: gradeWeight,
@@ -164,6 +171,8 @@ export const deleteAcademicYear = async (req: Request, res: Response, next: Next
     await prisma.academicYear.delete({
       where: { id },
     });
+
+    logActivity({ req, action: 'DELETE_ACADEMIC_YEAR', entity: 'AcademicYear', entityId: id, description: `Menghapus tahun ajaran: ${academicYear.year} - ${academicYear.semester}` });
 
     return res.status(200).json({ message: 'Tahun Ajaran berhasil dihapus.' });
   } catch (error) {

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../db';
+import { logActivity } from '../lib/activityLog';
 
 const DEFAULT_SCHOOL = {
   name: 'MI Bustanul Huda Dawuhan',
@@ -81,6 +82,12 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
         },
       });
     }
+
+    if (!profile) {
+      return res.status(500).json({ message: 'Gagal memproses profil madrasah.' });
+    }
+
+    logActivity({ req, action: 'UPDATE_SCHOOL_PROFILE', entity: 'SchoolProfile', entityId: profile.id, description: `Memperbarui profil madrasah: ${profile.name}` });
 
     let responseProfile = { ...profile };
     if (responseProfile.logoUrl && !responseProfile.logoUrl.startsWith('http')) {

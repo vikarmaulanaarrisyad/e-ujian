@@ -41,7 +41,30 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  activityLogs ActivityLog[]
+
   @@map("users")
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  userId      String?  @map("user_id")
+  userName    String   @map("user_name")
+  userRole    String   @map("user_role")
+  action      String
+  entity      String
+  entityId    String?  @map("entity_id")
+  description String   @db.Text
+  metadata    Json?
+  ipAddress   String?  @map("ip_address")
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("activity_logs")
 }
 
 model SchoolProfile {
