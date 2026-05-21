@@ -18,7 +18,8 @@ import {
   BookOpen,
   BookMarked,
   AlertTriangle,
-  Award
+  Award,
+  Calendar
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -38,6 +39,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Profil Madrasah', href: '/dashboard/school', icon: School, roles: ['ADMIN'] },
+    { name: 'Tahun Ajaran', href: '/dashboard/academic-years', icon: Calendar, roles: ['ADMIN'] },
     { name: 'Data Siswa', href: '/dashboard/students', icon: Users, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Mata Pelajaran', href: '/dashboard/subjects', icon: BookMarked, roles: ['ADMIN'] },
     { name: 'Input Nilai Rapor', href: '/dashboard/grades/reports', icon: BookOpen, roles: ['ADMIN', 'GURU', 'STAFF'] },
