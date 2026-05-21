@@ -3,8 +3,10 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Printer, Award, Download, Eye, FileText, X } from 'lucide-react';
+import { Award, Download, FileText, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface SubjectScore {
   subjectId: string;
@@ -40,8 +42,144 @@ export default function GradeRecapPage() {
     },
   });
 
-  const handlePrint = () => {
-    window.print();
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    if (!data?.recap || data.recap.length === 0) {
+      showToast('Tidak ada data untuk diunduh', 'error');
+      return;
+    }
+    
+    setIsDownloading(true);
+    
+    try {
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4',
+      });
+      
+      const pageWidth = doc.internal.pageSize.width;
+      
+      // Load logo if available
+      let logoData = null;
+      if (data?.schoolProfile?.logoUrl) {
+        try {
+          // Convert image URL to base64
+          const img = new Image();
+          img.crossOrigin = 'Anonymous';
+          img.src = data.schoolProfile.logoUrl;
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0);
+          logoData = canvas.toDataURL('image/png');
+        } catch (e) {
+          console.error("Could not load logo for PDF", e);
+        }
+      }
+
+      // Draw KOP Surat
+      if (logoData) {
+        doc.addImage(logoData, 'PNG', 15, 10, 25, 25);
+      }
+      
+      doc.setFont('times', 'bold');
+      doc.setFontSize(16);
+      doc.text(data?.schoolProfile?.name || 'MADRASAH IBTIDAIYAH', pageWidth / 2, 18, { align: 'center' });
+      
+      doc.setFont('times', 'normal');
+      doc.setFontSize(10);
+      doc.text(`NPSN: ${data?.schoolProfile?.npsn || '-'}`, pageWidth / 2, 24, { align: 'center' });
+      doc.text(data?.schoolProfile?.address || '-', pageWidth / 2, 29, { align: 'center' });
+      
+      // KOP Line
+      doc.setLineWidth(1);
+      doc.line(15, 38, pageWidth - 15, 38);
+      
+      // Title
+      doc.setFont('times', 'bold');
+      doc.setFontSize(14);
+      doc.text('LAPORAN REKAPITULASI NILAI AKHIR', pageWidth / 2, 48, { align: 'center' });
+      
+      doc.setFont('times', 'normal');
+      doc.setFontSize(10);
+      doc.text(`Tahun Pelajaran: ${data?.academicYear?.year || '...'} | Semester: ${data?.academicYear?.semester === 'EVEN' ? 'GENAP' : 'GANJIL'}`, pageWidth / 2, 54, { align: 'center' });
+      doc.setFont('times', 'italic');
+      doc.text(`Kalkulasi Bobot: Rapor ${data?.weight?.reportPercentage || 60}% & Ujian ${data?.weight?.examPercentage || 40}%`, pageWidth / 2, 59, { align: 'center' });
+      
+      // Prepare Table Data
+      const subjects = data.recap[0]?.subjectScores || [];
+      const headers = [
+        'NIS', 'Nama Lengkap', 'L/P',
+        ...subjects.map((sub: any) => sub.subjectCode),
+        'JUMLAH', 'RATA2', 'RANK'
+      ];
+      
+      const body = data.recap.map((student: StudentRecap) => [
+        student.nis,
+        student.studentName,
+        student.gender,
+        ...student.subjectScores.map(s => s.finalScore !== undefined && s.finalScore !== null ? s.finalScore.toFixed(0) : '0'),
+        student.totalFinalScore !== undefined && student.totalFinalScore !== null ? student.totalFinalScore.toFixed(0) : '0',
+        student.averageFinalScore !== undefined && student.averageFinalScore !== null ? student.averageFinalScore.toFixed(2) : '0.00',
+        student.rank !== undefined && student.rank !== null ? student.rank : '-'
+      ]);
+
+      // Draw Table
+      autoTable(doc, {
+        head: [headers],
+        body: body,
+        startY: 65,
+        theme: 'grid',
+        styles: { font: 'times', fontSize: 8, textColor: 0, halign: 'center' },
+        headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold', halign: 'center' },
+        columnStyles: {
+          1: { halign: 'left', cellWidth: 40 }, // Nama Lengkap
+        },
+        margin: { left: 15, right: 15 },
+        didDrawPage: function (dataInfo) {
+          // Add Signatures on the last page only
+          // We will draw it after the table, so we check if this is the last page (roughly)
+          // A better way is to capture the final Y and draw on the current page if space allows
+        }
+      });
+      
+      const finalY = (doc as any).lastAutoTable.finalY + 15;
+      
+      // Check if we need a new page for signatures
+      if (finalY > doc.internal.pageSize.height - 40) {
+        doc.addPage();
+      }
+      
+      const signY = finalY > doc.internal.pageSize.height - 40 ? 30 : finalY;
+      
+      // Draw Signatures
+      doc.setFont('times', 'normal');
+      doc.text(`Bondowoso, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth - 20, signY, { align: 'right' });
+      doc.setFont('times', 'bold');
+      doc.text('Kepala Madrasah,', pageWidth - 50, signY + 6, { align: 'center' });
+      
+      doc.text(data?.schoolProfile?.headmaster || '......................', pageWidth - 50, signY + 30, { align: 'center' });
+      doc.setFont('times', 'normal');
+      doc.text(`NIP. ${data?.schoolProfile?.headmasterNip || '-'}`, pageWidth - 50, signY + 35, { align: 'center' });
+
+      // Save PDF
+      const fileName = `Rekap_Nilai_Akhir_${data?.academicYear?.year ? data.academicYear.year.replace('/', '_') : 'recap'}.pdf`;
+      doc.save(fileName);
+      showToast('PDF berhasil diunduh.', 'success');
+      
+    } catch (err) {
+      console.error(err);
+      showToast('Terjadi kesalahan saat menggenerate PDF.', 'error');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleExportExcel = async () => {
@@ -140,21 +278,14 @@ export default function GradeRecapPage() {
           </button>
 
           <button
-            onClick={() => setIsPreviewOpen(true)}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-550 active:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all duration-200 shadow-md shadow-indigo-600/10"
+            onClick={handleDownloadPDF}
+            disabled={isDownloading}
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-550 active:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all duration-200 shadow-md shadow-indigo-600/10 disabled:opacity-50"
           >
-            <Eye className="w-4 h-4" />
-            <span>Pratinjau & Cetak F4</span>
+            {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+            <span>{isDownloading ? 'Memproses PDF...' : 'Unduh PDF'}</span>
           </button>
         </div>
-      </div>
-
-      {/* Print header (visible only on print) */}
-      <div className="hidden print:flex flex-col items-center text-center border-b-2 border-black pb-4 mb-6">
-        <h1 className="text-lg font-bold uppercase text-black">LAPORAN REKAPITULASI NILAI AKHIR SISWA</h1>
-        <h2 className="text-md font-bold uppercase text-black">MI BUSTANUL HUDA DAWUHAN</h2>
-        <p className="text-[10px] text-black mt-1">Tahun Pelajaran: {data?.academicYear?.year || '2025/2026'} | Semester: {data?.academicYear?.semester || 'GANJIL'}</p>
-        <p className="text-[9px] text-black mt-0.5">Bobot Kelulusan: Rapor {data?.weight?.reportPercentage || 60}% | Ujian {data?.weight?.examPercentage || 40}%</p>
       </div>
 
       {/* Recap details card */}
@@ -222,127 +353,9 @@ export default function GradeRecapPage() {
                 </tbody>
               </table>
             </div>
-
-            {/* Print sign area */}
-            <div className="hidden print:grid grid-cols-2 gap-8 pt-12 text-xs text-black">
-              <div></div>
-              <div className="text-center flex flex-col items-center">
-                <p>Bondowoso, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                <p className="mt-1 font-semibold">Kepala Madrasah,</p>
-                <div className="h-16"></div>
-                <p className="font-bold underline">H. Ahmad Fauzi, S.Pd.I</p>
-                <p>NIP. 197508122005011002</p>
-              </div>
-            </div>
           </div>
         )}
       </div>
-
-      {/* ------------------- F4 PRINT PREVIEW MODAL ------------------- */}
-      {isPreviewOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/95 flex flex-col justify-start items-center p-4 md:p-8 no-print animate-in fade-in duration-200">
-          
-          {/* Preview Toolbar */}
-          <div className="w-full max-w-[1200px] bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 shadow-xl">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20">
-                <FileText className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-100">Pratinjau Dokumen Cetak</h3>
-                <p className="text-[10px] text-slate-450 mt-0.5">Ukuran Kertas: F4 / Folio Lanskap (330mm x 215mm)</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-              <button
-                onClick={() => setIsPreviewOpen(false)}
-                className="w-full sm:w-auto px-4 py-2.5 bg-slate-850 hover:bg-slate-800 text-slate-350 hover:text-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer text-center"
-              >
-                Tutup
-              </button>
-              <button
-                onClick={handlePrint}
-                className="w-full sm:w-auto px-4 py-2.5 bg-emerald-650 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-lg shadow-emerald-500/10"
-              >
-                <Printer className="w-4 h-4" />
-                <span>Cetak / Simpan PDF</span>
-              </button>
-            </div>
-          </div>
-
-          {/* F4 Paper Canvas Sheet Simulation */}
-          <div className="w-full max-w-[1200px] overflow-x-auto pb-8">
-            <div className="f4-preview-sheet text-black font-sans shadow-2xl">
-              
-              {/* Kop Surat / Header */}
-              <div className="flex flex-col items-center text-center border-b-2 border-black pb-4 mb-6">
-                <h1 className="text-base font-bold uppercase tracking-wide">LAPORAN REKAPITULASI NILAI AKHIR SISWA</h1>
-                <h2 className="text-sm font-bold uppercase mt-0.5">MI BUSTANUL HUDA DAWUHAN</h2>
-                <p className="text-[10px] mt-1.5 font-medium">Tahun Pelajaran: {data?.academicYear?.year || '2025/2026'} | Semester: {data?.academicYear?.semester || 'GANJIL'}</p>
-                <p className="text-[9px] mt-0.5 text-gray-650">Bobot Kelulusan: Rapor {data?.weight?.reportPercentage || 60}% | Ujian {data?.weight?.examPercentage || 40}%</p>
-              </div>
-
-              {/* Data Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-[10px]" style={{ color: 'black' }}>
-                  <thead>
-                    <tr className="border-b border-black">
-                      <th className="py-2 px-3 border border-black font-bold uppercase text-center bg-gray-50 text-[9px] text-black">NIS</th>
-                      <th className="py-2 px-3 border border-black font-bold uppercase text-left bg-gray-50 text-[9px] text-black">Nama Lengkap</th>
-                      <th className="py-2 px-3 border border-black font-bold uppercase text-center bg-gray-50 text-[9px] text-black">L/P</th>
-                      {subjects.map((sub: any) => (
-                        <th key={sub.subjectId} className="py-2 px-1 border border-black font-bold uppercase text-center bg-gray-50 text-[8px] text-black" title={sub.subjectName}>
-                          {sub.subjectCode}
-                        </th>
-                      ))}
-                      <th className="py-2 px-3 border border-black font-bold uppercase text-center bg-gray-105 text-[9px] text-black">Jumlah</th>
-                      <th className="py-2 px-3 border border-black font-bold uppercase text-center bg-gray-105 text-[9px] text-black">Rata2</th>
-                      <th className="py-2 px-3 border border-black font-bold uppercase text-center bg-gray-105 text-[9px] text-black">Rank</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {data?.recap?.map((student: StudentRecap) => (
-                      <tr key={student.studentId} className="hover:bg-gray-50/50">
-                        <td className="py-2 px-3 border border-black font-mono text-center text-black">{student.nis}</td>
-                        <td className="py-2 px-3 border border-black font-bold text-left text-black">{student.studentName}</td>
-                        <td className="py-2 px-3 border border-black text-center text-black">{student.gender}</td>
-                        {student.subjectScores.map((score) => (
-                          <td key={score.subjectId} className="py-2 px-1 border border-black text-center font-mono text-black">
-                            {score.finalScore !== undefined && score.finalScore !== null ? score.finalScore.toFixed(0) : '0'}
-                          </td>
-                        ))}
-                        <td className="py-2 px-3 border border-black text-center font-bold font-mono bg-gray-50/30 text-black">
-                          {student.totalFinalScore !== undefined && student.totalFinalScore !== null ? student.totalFinalScore.toFixed(0) : '0'}
-                        </td>
-                        <td className="py-2 px-3 border border-black text-center font-bold font-mono bg-gray-50/30 text-black">
-                          {student.averageFinalScore !== undefined && student.averageFinalScore !== null ? student.averageFinalScore.toFixed(2) : '0.00'}
-                        </td>
-                        <td className="py-2 px-3 border border-black text-center font-bold font-mono bg-gray-50/30 text-black">
-                          {student.rank !== undefined && student.rank !== null ? student.rank : '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Tanda Tangan */}
-              <div className="grid grid-cols-2 gap-8 pt-10 text-[10px]" style={{ color: 'black' }}>
-                <div></div>
-                <div className="text-center flex flex-col items-center ml-auto w-64 text-black">
-                  <p>Bondowoso, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                  <p className="mt-0.5 font-semibold">Kepala Madrasah,</p>
-                  <div className="h-16"></div>
-                  <p className="font-bold underline">H. Ahmad Fauzi, S.Pd.I</p>
-                  <p>NIP. 197508122005011002</p>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

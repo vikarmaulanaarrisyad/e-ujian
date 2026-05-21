@@ -866,6 +866,27 @@ export const getGradeRecap = async (req: Request, res: Response, next: NextFunct
     const rWeight = weight.reportPercentage / 100.0;
     const eWeight = weight.examPercentage / 100.0;
 
+    // Fetch school profile
+    let schoolProfile = await prisma.schoolProfile.findFirst();
+    if (!schoolProfile) {
+      schoolProfile = {
+        id: 'default',
+        name: 'MI Bustanul Huda Dawuhan',
+        npsn: '20512345',
+        address: 'Jl. Contoh Alamat No. 123, Dawuhan, Jawa Timur',
+        headmaster: 'H. Fulan, S.Pd.I',
+        headmasterNip: '19700101 200003 1 001',
+        logoUrl: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+    if (schoolProfile.logoUrl && !schoolProfile.logoUrl.startsWith('http')) {
+      const host = req.get('host');
+      const protocol = req.protocol;
+      schoolProfile.logoUrl = `${protocol}://${host}${schoolProfile.logoUrl}`;
+    }
+
     // Fetch all students, report card grades, and exam grades
     const students = await prisma.student.findMany({
       orderBy: { name: 'asc' },
@@ -975,6 +996,7 @@ export const getGradeRecap = async (req: Request, res: Response, next: NextFunct
       },
       weight,
       recap: recapWithRank,
+      schoolProfile,
     });
   } catch (error) {
     next(error);
