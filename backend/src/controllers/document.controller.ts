@@ -20,19 +20,26 @@ export const getStudentDocumentData = async (req: Request, res: Response, next: 
     const eWeight = weight.examPercentage / 100.0;
 
     // Fetch school profile (assuming there's only one)
-    let schoolProfile = await prisma.schoolProfile.findFirst();
-    if (!schoolProfile) {
-      schoolProfile = {
+    let profile: any = await prisma.schoolProfile.findFirst();
+    if (!profile) {
+      profile = {
         id: 'default',
         name: 'MI Bustanul Huda Dawuhan',
         npsn: '20512345',
         address: 'Jl. Contoh Alamat No. 123, Dawuhan, Jawa Timur',
         headmaster: 'H. Fulan, S.Pd.I',
         headmasterNip: '19700101 200003 1 001',
+        city: null,
         logoUrl: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+    }
+    
+    if (profile.logoUrl && !profile.logoUrl.startsWith('http')) {
+      const host = req.get('host');
+      const protocol = req.protocol;
+      profile.logoUrl = `${protocol}://${host}${profile.logoUrl}`;
     }
 
     // Fetch student with all their grades
@@ -122,7 +129,7 @@ export const getStudentDocumentData = async (req: Request, res: Response, next: 
         graduationDate: student.graduationDate,
         certificateNumber: student.certificateNumber,
       },
-      schoolProfile,
+      schoolProfile: profile,
       grades,
       averageFinalScore,
       academicYear: activeYear.year,

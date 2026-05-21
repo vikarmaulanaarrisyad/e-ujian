@@ -38,10 +38,15 @@ export default function SchoolProfilePage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await api.get('/school');
-        setProfile(res.data);
-        if (res.data.logoUrl) {
-          setPreviewUrl(res.data.logoUrl);
+        const data = res.data;
+        setProfile({
+          ...data,
+          npsn: data.npsn || '',
+          headmasterNip: data.headmasterNip || '',
+          city: data.city || '',
+        });
+        if (data.logoUrl) {
+          setPreviewUrl(data.logoUrl);
         }
       } catch (error) {
         showToast('Gagal memuat profil madrasah.', 'error');

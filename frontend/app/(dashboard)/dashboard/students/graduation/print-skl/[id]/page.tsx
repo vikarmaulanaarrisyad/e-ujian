@@ -92,7 +92,15 @@ export default function PrintSKLPage() {
         .kop-surat::after {
           content: "";
           position: absolute;
-          bottom: -6px;
+          bottom: -5px;
+          left: 0;
+          right: 0;
+          border-bottom: 3px solid black;
+        }
+        .kop-surat::before {
+          content: "";
+          position: absolute;
+          bottom: -8px;
           left: 0;
           right: 0;
           border-bottom: 1px solid black;
@@ -122,8 +130,9 @@ export default function PrintSKLPage() {
             </div>
             
             <div className="flex-1 text-center px-4">
-              <h1 className="text-2xl font-extrabold uppercase tracking-widest mb-2">{schoolProfile.name}</h1>
-              <p className="text-sm">NPSN: {schoolProfile.npsn || '-'}</p>
+              <h2 className="text-xl font-bold uppercase tracking-wider mb-1">YAYASAN BUSTANUL HUDA DAWUHAN</h2>
+              <h1 className="text-2xl font-extrabold uppercase tracking-widest mb-2">{schoolProfile.name || 'MI BUSTANUL HUDA 01 DAWUHAN'}</h1>
+              <p className="text-[13px] font-semibold mb-1">TERAKREDITASI A &nbsp;&nbsp; NPSN : {schoolProfile.npsn || '60713609'} &nbsp;&nbsp; NSM : 111233280040</p>
               <p className="text-sm">{schoolProfile.address}</p>
             </div>
             

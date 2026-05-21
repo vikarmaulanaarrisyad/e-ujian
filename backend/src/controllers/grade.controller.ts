@@ -58,6 +58,8 @@ export const getGradeWeight = async (req: Request, res: Response, next: NextFunc
       });
     }
 
+    const profile: any = await prisma.schoolProfile.findFirst();
+
     return res.status(200).json({
       academicYear: {
         id: activeYear.id,
@@ -65,6 +67,7 @@ export const getGradeWeight = async (req: Request, res: Response, next: NextFunc
         semester: activeYear.semester,
       },
       weight,
+      schoolProfile: profile,
     });
   } catch (error) {
     next(error);
@@ -867,24 +870,25 @@ export const getGradeRecap = async (req: Request, res: Response, next: NextFunct
     const eWeight = weight.examPercentage / 100.0;
 
     // Fetch school profile
-    let schoolProfile = await prisma.schoolProfile.findFirst();
-    if (!schoolProfile) {
-      schoolProfile = {
+    let profile: any = await prisma.schoolProfile.findFirst();
+    if (!profile) {
+      profile = {
         id: 'default',
         name: 'MI Bustanul Huda Dawuhan',
         npsn: '20512345',
         address: 'Jl. Contoh Alamat No. 123, Dawuhan, Jawa Timur',
         headmaster: 'H. Fulan, S.Pd.I',
         headmasterNip: '19700101 200003 1 001',
+        city: null,
         logoUrl: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
     }
-    if (schoolProfile.logoUrl && !schoolProfile.logoUrl.startsWith('http')) {
+    if (profile.logoUrl && !profile.logoUrl.startsWith('http')) {
       const host = req.get('host');
       const protocol = req.protocol;
-      schoolProfile.logoUrl = `${protocol}://${host}${schoolProfile.logoUrl}`;
+      profile.logoUrl = `${protocol}://${host}${profile.logoUrl}`;
     }
 
     // Fetch all students, report card grades, and exam grades
@@ -996,7 +1000,7 @@ export const getGradeRecap = async (req: Request, res: Response, next: NextFunct
       },
       weight,
       recap: recapWithRank,
-      schoolProfile,
+      schoolProfile: profile,
     });
   } catch (error) {
     next(error);
@@ -1125,6 +1129,7 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
 
     columns.push({ key: 'total', width: 12 });
     columns.push({ key: 'avg', width: 12 });
+    columns.push({ key: 'avg_round', width: 15 });
     columns.push({ key: 'rank', width: 10 });
 
     worksheet.columns = columns;
@@ -1144,7 +1149,8 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
     const totalCols = 4 + subjects.length;
     row1.getCell(totalCols + 1).value = 'JUMLAH';
     row1.getCell(totalCols + 2).value = 'RATA-RATA';
-    row1.getCell(totalCols + 3).value = 'PERINGKAT';
+    row1.getCell(totalCols + 3).value = 'RATA-RATA BULAT';
+    row1.getCell(totalCols + 4).value = 'PERINGKAT';
 
     const headerBorder: Partial<ExcelJS.Borders> = {
       top: { style: 'thin', color: { argb: 'A0A0A0' } },
@@ -1153,7 +1159,7 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
       right: { style: 'thin', color: { argb: 'A0A0A0' } }
     };
 
-    const finalTotalCols = totalCols + 3;
+    const finalTotalCols = totalCols + 4;
 
     for (let c = 1; c <= finalTotalCols; c++) {
       const cell = row1.getCell(c);
@@ -1181,6 +1187,7 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
         gender: student.gender,
         total: student.totalFinalScore !== 0 ? Number(student.totalFinalScore.toFixed(0)) : '',
         avg: student.averageFinalScore !== 0 ? Number(student.averageFinalScore.toFixed(2)) : '',
+        avg_round: student.averageFinalScore !== 0 ? Number(Math.round(student.averageFinalScore).toFixed(0)) : '',
         rank: student.rank
       };
 

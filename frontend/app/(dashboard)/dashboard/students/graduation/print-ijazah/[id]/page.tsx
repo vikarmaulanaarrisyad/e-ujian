@@ -85,6 +85,22 @@ export default function PrintIjazahPage() {
           font-family: "Times New Roman", Times, serif;
           position: relative;
         }
+        .kop-surat::after {
+          content: "";
+          position: absolute;
+          bottom: -5px;
+          left: 0;
+          right: 0;
+          border-bottom: 3px solid black;
+        }
+        .kop-surat::before {
+          content: "";
+          position: absolute;
+          bottom: -8px;
+          left: 0;
+          right: 0;
+          border-bottom: 1px solid black;
+        }
         .ijazah-table th, .ijazah-table td {
           border: 1px solid black;
           padding: 6px 12px;
@@ -105,9 +121,13 @@ export default function PrintIjazahPage() {
       <div className="print-container">
         
         {/* Header Text */}
-        <div className="text-center mb-8">
-          <h2 className="text-xl font-bold uppercase tracking-wider mb-1">DAFTAR NILAI MADRASAH IBTIDAIYAH</h2>
-          <p className="text-md uppercase mb-1">TAHUN PELAJARAN {academicYear}</p>
+        <div className="kop-surat relative text-center mb-8 pb-4">
+          <div className="flex-1 text-center px-4">
+            <h2 className="text-xl font-bold uppercase tracking-wider mb-1">YAYASAN BUSTANUL HUDA DAWUHAN</h2>
+            <h1 className="text-2xl font-extrabold uppercase tracking-widest mb-2">{schoolProfile.name || 'MI BUSTANUL HUDA 01 DAWUHAN'}</h1>
+            <p className="text-[13px] font-semibold mb-1">TERAKREDITASI A &nbsp;&nbsp; NPSN : {schoolProfile.npsn || '60713609'} &nbsp;&nbsp; NSM : 111233280040</p>
+            <p className="text-sm">{schoolProfile.address}</p>
+          </div>
         </div>
 
         {/* Student Biodata */}

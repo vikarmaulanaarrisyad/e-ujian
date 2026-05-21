@@ -90,17 +90,22 @@ export default function GradeRecapPage() {
       }
       
       doc.setFont('times', 'bold');
-      doc.setFontSize(16);
-      doc.text(data?.schoolProfile?.name || 'MADRASAH IBTIDAIYAH', pageWidth / 2, 18, { align: 'center' });
+      doc.setFontSize(14);
+      doc.text('YAYASAN BUSTANUL HUDA DAWUHAN', pageWidth / 2, 14, { align: 'center' });
+      
+      doc.setFontSize(18);
+      doc.text(data?.schoolProfile?.name || 'MI BUSTANUL HUDA 01 DAWUHAN', pageWidth / 2, 21, { align: 'center' });
       
       doc.setFont('times', 'normal');
       doc.setFontSize(10);
-      doc.text(`NPSN: ${data?.schoolProfile?.npsn || '-'}`, pageWidth / 2, 24, { align: 'center' });
-      doc.text(data?.schoolProfile?.address || '-', pageWidth / 2, 29, { align: 'center' });
+      doc.text(`TERAKREDITASI A     NPSN : ${data?.schoolProfile?.npsn || '60713609'}    NSM : 111233280040`, pageWidth / 2, 27, { align: 'center' });
+      doc.text(data?.schoolProfile?.address || '-', pageWidth / 2, 32, { align: 'center' });
       
-      // KOP Line
+      // KOP Double Line
       doc.setLineWidth(1);
-      doc.line(15, 38, pageWidth - 15, 38);
+      doc.line(15, 36, pageWidth - 15, 36);
+      doc.setLineWidth(0.5);
+      doc.line(15, 37.5, pageWidth - 15, 37.5);
       
       // Title
       doc.setFont('times', 'bold');
@@ -118,7 +123,7 @@ export default function GradeRecapPage() {
       const headers = [
         'NIS', 'Nama Lengkap', 'L/P',
         ...subjects.map((sub: any) => sub.subjectCode),
-        'JUMLAH', 'RATA2', 'RANK'
+        'JUMLAH', 'RATA2', 'RATA2 BULAT', 'RANK'
       ];
       
       const body = data.recap.map((student: StudentRecap) => [
@@ -128,6 +133,7 @@ export default function GradeRecapPage() {
         ...student.subjectScores.map(s => s.finalScore !== undefined && s.finalScore !== null ? s.finalScore.toFixed(0) : '0'),
         student.totalFinalScore !== undefined && student.totalFinalScore !== null ? student.totalFinalScore.toFixed(0) : '0',
         student.averageFinalScore !== undefined && student.averageFinalScore !== null ? student.averageFinalScore.toFixed(2) : '0.00',
+        student.averageFinalScore !== undefined && student.averageFinalScore !== null ? Math.round(student.averageFinalScore).toFixed(0) : '0',
         student.rank !== undefined && student.rank !== null ? student.rank : '-'
       ]);
 
@@ -326,6 +332,7 @@ export default function GradeRecapPage() {
                     ))}
                     <th className="py-3 px-4 text-center font-bold text-emerald-400 print:text-black print:border print:border-black">JUMLAH</th>
                     <th className="py-3 px-4 text-center font-bold text-indigo-400 print:text-black print:border print:border-black">RATA2</th>
+                    <th className="py-3 px-4 text-center font-bold text-indigo-400 print:text-black print:border print:border-black">RATA2 BULAT</th>
                     <th className="py-3 px-4 text-center font-bold text-amber-400 print:text-black print:border print:border-black">RANK</th>
                   </tr>
                 </thead>
@@ -345,6 +352,9 @@ export default function GradeRecapPage() {
                       </td>
                       <td className="py-3 px-4 text-center font-bold font-mono text-indigo-400 print:text-black print:border print:border-black">
                         {student.averageFinalScore !== undefined && student.averageFinalScore !== null ? student.averageFinalScore.toFixed(2) : '0.00'}
+                      </td>
+                      <td className="py-3 px-4 text-center font-bold font-mono text-indigo-400 print:text-black print:border print:border-black">
+                        {student.averageFinalScore !== undefined && student.averageFinalScore !== null ? Math.round(student.averageFinalScore).toFixed(0) : '0'}
                       </td>
                       <td className="py-3 px-4 text-center font-bold font-mono text-amber-400 print:text-black print:border print:border-black">
                         {student.rank !== undefined && student.rank !== null ? student.rank : '-'}

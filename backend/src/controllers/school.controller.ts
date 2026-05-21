@@ -7,6 +7,7 @@ const DEFAULT_SCHOOL = {
   address: 'Jl. Contoh Alamat No. 123, Dawuhan, Jawa Timur',
   headmaster: 'H. Fulan, S.Pd.I',
   headmasterNip: '19700101 200003 1 001',
+  city: null,
 };
 
 export const getSchoolProfile = async (req: Request, res: Response, next: NextFunction) => {
