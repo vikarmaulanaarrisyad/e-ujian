@@ -17,6 +17,7 @@ import {
   getGradeRecap,
   exportGradeRecap,
   getSubjects,
+  getMissingGrades,
 } from '../controllers/grade.controller';
 import { authenticateJWT } from '../middlewares/auth.middleware';
 import { requireRoles } from '../middlewares/rbac.middleware';
@@ -54,5 +55,8 @@ router.post('/exams/import-all', requireRoles(Role.ADMIN, Role.STAFF), upload.si
 // Final calculated grade recap
 router.get('/recap', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getGradeRecap);
 router.get('/recap/export', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), exportGradeRecap);
+
+// Missing grades checker
+router.get('/missing', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getMissingGrades);
 
 export default router;

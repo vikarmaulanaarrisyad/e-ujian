@@ -16,7 +16,8 @@ import {
   School,
   ChevronRight,
   BookOpen,
-  BookMarked
+  BookMarked,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -40,6 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Input Nilai Rapor', href: '/dashboard/grades/reports', icon: BookOpen, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Input Nilai Ujian', href: '/dashboard/grades/exams', icon: GraduationCap, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Rekap Nilai', href: '/dashboard/grades/recap', icon: FileSpreadsheet, roles: ['ADMIN', 'GURU', 'STAFF'] },
+    { name: 'Nilai Belum Masuk', href: '/dashboard/grades/missing', icon: AlertTriangle, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Pengaturan Bobot', href: '/dashboard/settings', icon: Settings, roles: ['ADMIN'] },
   ];
 

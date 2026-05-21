@@ -33,3 +33,19 @@ export const upload = multer({
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
+
+// ── JSON uploader for database backup restore ──
+const jsonFileFilter = (req: any, file: any, cb: any) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ext === '.json') {
+    cb(null, true);
+  } else {
+    cb(new Error('Only JSON backup files (.json) are allowed'), false);
+  }
+};
+
+export const uploadJson = multer({
+  storage,
+  fileFilter: jsonFileFilter,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for backups
+});

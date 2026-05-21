@@ -1197,6 +1197,112 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
 };
 
 // Get list of all subjects
+export const getMissingGrades = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const activeYear = await getActiveYear();
+    if (!activeYear) {
+      return res.status(404).json({ message: 'No active academic year found' });
+    }
+
+    const [students, subjects, existingReportGrades, existingExamGrades] = await Promise.all([
+      prisma.student.findMany({ orderBy: { name: 'asc' } }),
+      prisma.subject.findMany({ orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }] }),
+      prisma.reportGrade.findMany({
+        where: { academicYearId: activeYear.id },
+        select: { studentId: true, subjectId: true, semester: true },
+      }),
+      prisma.examGrade.findMany({
+        where: { academicYearId: activeYear.id },
+        select: { studentId: true, subjectId: true },
+      }),
+    ]);
+
+    const SEMESTERS = [7, 8, 9, 10, 11];
+
+    // Build lookup sets for fast O(1) checking
+    const reportSet = new Set(
+      existingReportGrades.map((g) => `${g.studentId}|${g.subjectId}|${g.semester}`)
+    );
+    const examSet = new Set(
+      existingExamGrades.map((g) => `${g.studentId}|${g.subjectId}`)
+    );
+
+    const totalReportSlots = students.length * subjects.length * SEMESTERS.length;
+    const totalExamSlots = students.length * subjects.length;
+    const filledReportSlots = existingReportGrades.length;
+    const filledExamSlots = existingExamGrades.length;
+
+    const missingReportGrades: any[] = [];
+    const missingExamGrades: any[] = [];
+
+    for (const student of students) {
+      for (const subject of subjects) {
+        // Check missing report grades
+        const missingSemesters = SEMESTERS.filter(
+          (sem) => !reportSet.has(`${student.id}|${subject.id}|${sem}`)
+        );
+        if (missingSemesters.length > 0) {
+          missingReportGrades.push({
+            studentId: student.id,
+            studentName: student.name,
+            nis: student.nis,
+            nisn: student.nisn,
+            subjectId: subject.id,
+            subjectName: subject.name,
+            subjectCode: subject.code,
+            subjectGroup: subject.group,
+            missingSemesters,
+          });
+        }
+
+        // Check missing exam grades
+        if (!examSet.has(`${student.id}|${subject.id}`)) {
+          missingExamGrades.push({
+            studentId: student.id,
+            studentName: student.name,
+            nis: student.nis,
+            nisn: student.nisn,
+            subjectId: subject.id,
+            subjectName: subject.name,
+            subjectCode: subject.code,
+            subjectGroup: subject.group,
+          });
+        }
+      }
+    }
+
+    return res.status(200).json({
+      academicYear: {
+        id: activeYear.id,
+        year: activeYear.year,
+        semester: activeYear.semester,
+      },
+      summary: {
+        totalStudents: students.length,
+        totalSubjects: subjects.length,
+        totalReportSlots,
+        filledReportSlots,
+        missingReportSlots: totalReportSlots - filledReportSlots,
+        totalExamSlots,
+        filledExamSlots,
+        missingExamSlots: totalExamSlots - filledExamSlots,
+        reportCompletionPct:
+          totalReportSlots > 0
+            ? Math.round((filledReportSlots / totalReportSlots) * 100)
+            : 100,
+        examCompletionPct:
+          totalExamSlots > 0
+            ? Math.round((filledExamSlots / totalExamSlots) * 100)
+            : 100,
+      },
+      missingReportGrades,
+      missingExamGrades,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getSubjects = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const subjects = await prisma.subject.findMany({
