@@ -29,8 +29,9 @@ export default function ReportGradesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileInputAllRef = useRef<HTMLInputElement>(null);
 
-  // Selected Subject State
+  // Selected Subject & Semester State
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [selectedSemester, setSelectedSemester] = useState<string>('');
   const [importing, setImporting] = useState(false);
   const [importingAll, setImportingAll] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -146,9 +147,11 @@ export default function ReportGradesPage() {
   const handleExportExcel = async () => {
     if (!selectedSubjectId) return;
     try {
-      const response = await api.get(`/grades/reports/export?subjectId=${selectedSubjectId}`, { responseType: 'blob' });
+      const semParam = selectedSemester ? `&semester=${selectedSemester}` : '';
+      const response = await api.get(`/grades/reports/export?subjectId=${selectedSubjectId}${semParam}`, { responseType: 'blob' });
       const currentSubject = subjects.find(s => s.id === selectedSubjectId);
-      const fileName = `nilai_rapor_${currentSubject?.code.toLowerCase() || 'subject'}.xlsx`;
+      const semSuffix = selectedSemester ? `_smt_${selectedSemester}` : '';
+      const fileName = `nilai_rapor_${currentSubject?.code.toLowerCase() || 'subject'}${semSuffix}.xlsx`;
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
@@ -205,8 +208,10 @@ export default function ReportGradesPage() {
 
   const handleExportAllExcel = async () => {
     try {
-      const response = await api.get('/grades/reports/export-all', { responseType: 'blob' });
-      const fileName = `nilai_rapor_semua_mapel.xlsx`;
+      const semParam = selectedSemester ? `?semester=${selectedSemester}` : '';
+      const response = await api.get(`/grades/reports/export-all${semParam}`, { responseType: 'blob' });
+      const semSuffix = selectedSemester ? `_smt_${selectedSemester}` : '';
+      const fileName = `nilai_rapor_semua_mapel${semSuffix}.xlsx`;
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
@@ -231,6 +236,40 @@ export default function ReportGradesPage() {
         reader.readAsText(err.response.data);
       } else {
         showToast(err.response?.data?.message || err.message || 'Gagal mengekspor template nilai semua mapel.', 'error');
+      }
+    }
+  };
+
+  const handleExportGradesAllExcel = async () => {
+    try {
+      const semParam = selectedSemester ? `?semester=${selectedSemester}` : '';
+      const response = await api.get(`/grades/reports/export-all${semParam}`, { responseType: 'blob' });
+      const semSuffix = selectedSemester ? `_smt_${selectedSemester}` : '';
+      const fileName = `ekspor_nilai_rapor_semua_mapel${semSuffix}.xlsx`;
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      showToast('Ekspor nilai rapor semua mapel berhasil diunduh.', 'success');
+    } catch (err: any) {
+      console.error(err);
+      if (err.response?.data instanceof Blob) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const errorData = JSON.parse(reader.result as string);
+            showToast(errorData.message || 'Gagal mengekspor nilai semua mapel.', 'error');
+          } catch {
+            showToast('Gagal mengekspor nilai semua mapel.', 'error');
+          }
+        };
+        reader.readAsText(err.response.data);
+      } else {
+        showToast(err.response?.data?.message || err.message || 'Gagal mengekspor nilai semua mapel.', 'error');
       }
     }
   };
@@ -278,7 +317,15 @@ export default function ReportGradesPage() {
             className="px-4 py-2.5 bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-900/60 rounded-xl text-xs font-semibold text-indigo-300 flex items-center gap-2 cursor-pointer transition-all duration-200"
           >
             <Download className="w-4 h-4 text-indigo-400" />
-            <span>Unduh Template Semua Mapel</span>
+            <span>Unduh Template Semua Mapel{selectedSemester ? ` (Smt ${selectedSemester})` : ''}</span>
+          </button>
+
+          <button
+            onClick={handleExportGradesAllExcel}
+            className="px-4 py-2.5 bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-800/50 rounded-xl text-xs font-semibold text-emerald-450 flex items-center gap-2 cursor-pointer transition-all duration-200"
+          >
+            <Download className="w-4 h-4 text-emerald-400" />
+            <span>Ekspor Nilai Rapor (Semua Mapel{selectedSemester ? ` - Smt ${selectedSemester}` : ''})</span>
           </button>
 
           {user?.role !== 'GURU' && (
@@ -310,7 +357,7 @@ export default function ReportGradesPage() {
               className="px-4 py-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 flex items-center gap-2 cursor-pointer transition-all duration-200"
             >
               <Download className="w-4 h-4 text-slate-450" />
-              <span>Unduh Template Rapor</span>
+              <span>Unduh Template Rapor{selectedSemester ? ` (Smt ${selectedSemester})` : ''}</span>
             </button>
           )}
 
@@ -357,6 +404,22 @@ export default function ReportGradesPage() {
               )}
             </select>
           </div>
+
+          <div className="w-full sm:max-w-[185px]">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Pilih Semester</label>
+            <select
+              value={selectedSemester}
+              onChange={(e) => setSelectedSemester(e.target.value)}
+              className="block w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors"
+            >
+              <option value="">Semua Semester</option>
+              <option value="7">Semester 7</option>
+              <option value="8">Semester 8</option>
+              <option value="9">Semester 9</option>
+              <option value="10">Semester 10</option>
+              <option value="11">Semester 11</option>
+            </select>
+          </div>
         </div>
 
         {/* Input Feedback Notification */}
@@ -391,16 +454,16 @@ export default function ReportGradesPage() {
         ) : (
           <div className="space-y-6">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[700px]">
+              <table className="w-full text-left border-collapse min-w-[500px]">
                 <thead>
                   <tr className="border-b border-slate-800/60 text-slate-450 text-[10px] font-bold uppercase tracking-wider">
                     <th className="py-3.5 px-4 w-[150px]">NIS</th>
                     <th className="py-3.5 px-4 w-[250px]">Nama Lengkap</th>
-                    <th className="py-3.5 px-4 text-center">Smt 7</th>
-                    <th className="py-3.5 px-4 text-center">Smt 8</th>
-                    <th className="py-3.5 px-4 text-center">Smt 9</th>
-                    <th className="py-3.5 px-4 text-center">Smt 10</th>
-                    <th className="py-3.5 px-4 text-center">Smt 11</th>
+                    {(!selectedSemester || selectedSemester === '7') && <th className="py-3.5 px-4 text-center">Smt 7</th>}
+                    {(!selectedSemester || selectedSemester === '8') && <th className="py-3.5 px-4 text-center">Smt 8</th>}
+                    {(!selectedSemester || selectedSemester === '9') && <th className="py-3.5 px-4 text-center">Smt 9</th>}
+                    {(!selectedSemester || selectedSemester === '10') && <th className="py-3.5 px-4 text-center">Smt 10</th>}
+                    {(!selectedSemester || selectedSemester === '11') && <th className="py-3.5 px-4 text-center">Smt 11</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/40 text-xs text-slate-300">
@@ -408,17 +471,20 @@ export default function ReportGradesPage() {
                     <tr key={student.studentId} className="hover:bg-slate-900/10">
                       <td className="py-3.5 px-4 font-mono text-slate-450">{student.nis}</td>
                       <td className="py-3.5 px-4 font-semibold text-slate-205">{student.studentName}</td>
-                      {[7, 8, 9, 10, 11].map((sem) => (
-                        <td key={sem} className="py-2.5 px-4 text-center">
-                          <input
-                            type="text"
-                            value={gridGrades[student.studentId]?.[sem] ?? ''}
-                            onChange={(e) => handleCellChange(student.studentId, sem, e.target.value)}
-                            className="w-16 px-2 py-1.5 bg-slate-950/80 border border-slate-800 rounded-lg text-center font-mono text-xs focus:outline-none focus:border-indigo-500 transition-colors"
-                            placeholder="-"
-                          />
-                        </td>
-                      ))}
+                      {[7, 8, 9, 10, 11].map((sem) => {
+                        if (selectedSemester && selectedSemester !== String(sem)) return null;
+                        return (
+                          <td key={sem} className="py-2.5 px-4 text-center">
+                            <input
+                              type="text"
+                              value={gridGrades[student.studentId]?.[sem] ?? ''}
+                              onChange={(e) => handleCellChange(student.studentId, sem, e.target.value)}
+                              className="w-16 px-2 py-1.5 bg-slate-950/80 border border-slate-800 rounded-lg text-center font-mono text-xs focus:outline-none focus:border-indigo-500 transition-colors"
+                              placeholder="-"
+                            />
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>

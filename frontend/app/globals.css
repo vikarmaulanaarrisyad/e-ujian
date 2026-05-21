@@ -130,7 +130,11 @@
 }
 
 @media print {
-  aside, header, button, select, nav, .print\:hidden {
+  @page {
+    size: 330mm 215mm; /* F4 Folio Landscape */
+    margin: 10mm 10mm 10mm 10mm;
+  }
+  aside, header, button, select, nav, .print\:hidden, .no-print {
     display: none !important;
   }
   body, html, main, .print-container {
@@ -141,14 +145,71 @@
     padding: 0 !important;
     margin: 0 !important;
   }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
   table {
     border-collapse: collapse !important;
     width: 100% !important;
     color: black !important;
+    margin-top: 10px !important;
+    font-size: 9px !important;
   }
-  th, td {
-    border: 1px solid black !important;
-    padding: 6px 10px !important;
+  thead {
+    display: table-header-group !important;
+  }
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  th {
+    background-color: #f1f5f9 !important;
+    border: 1px solid #000000 !important;
+    padding: 6px 3px !important;
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    font-size: 8px !important;
+    text-align: center !important;
     color: black !important;
+  }
+  th:nth-child(2) {
+    text-align: left !important;
+    padding-left: 8px !important;
+  }
+  td {
+    border: 1px solid #000000 !important;
+    padding: 5px 3px !important;
+    color: black !important;
+    font-size: 8px !important;
+    text-align: center !important;
+  }
+  td:nth-child(2) {
+    text-align: left !important;
+    font-weight: bold !important;
+    padding-left: 8px !important;
+  }
+}
+
+/* F4 Print Preview Sheet Simulation */
+.f4-preview-sheet {
+  background-color: white;
+  color: black;
+  width: 100%;
+  max-width: 1122px; /* approximate F4 landscape ratio width */
+  aspect-ratio: 330 / 215;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+  padding: 15mm;
+  margin: 0 auto;
+  box-sizing: border-box;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+}
+
+@media (max-width: 1200px) {
+  .f4-preview-sheet {
+    aspect-ratio: auto;
+    min-height: 600px;
+    padding: 10mm;
   }
 }

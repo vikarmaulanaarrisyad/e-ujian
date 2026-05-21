@@ -25,7 +25,9 @@ router.post('/reports/import-all', (0, rbac_middleware_1.requireRoles)(client_1.
 router.get('/exams', (0, rbac_middleware_1.requireRoles)(client_1.Role.ADMIN, client_1.Role.GURU, client_1.Role.STAFF), grade_controller_1.getExamGrades);
 router.post('/exams', (0, rbac_middleware_1.requireRoles)(client_1.Role.ADMIN, client_1.Role.GURU, client_1.Role.STAFF), grade_controller_1.saveExamGrades);
 router.get('/exams/export', (0, rbac_middleware_1.requireRoles)(client_1.Role.ADMIN, client_1.Role.GURU, client_1.Role.STAFF), grade_controller_1.exportExamGrades);
+router.get('/exams/export-all', (0, rbac_middleware_1.requireRoles)(client_1.Role.ADMIN, client_1.Role.GURU, client_1.Role.STAFF), grade_controller_1.exportAllExamGrades);
 router.post('/exams/import', (0, rbac_middleware_1.requireRoles)(client_1.Role.ADMIN, client_1.Role.STAFF), upload_middleware_1.upload.single('file'), grade_controller_1.importExamGrades);
+router.post('/exams/import-all', (0, rbac_middleware_1.requireRoles)(client_1.Role.ADMIN, client_1.Role.STAFF), upload_middleware_1.upload.single('file'), grade_controller_1.importAllExamGrades);
 // Final calculated grade recap
 router.get('/recap', (0, rbac_middleware_1.requireRoles)(client_1.Role.ADMIN, client_1.Role.GURU, client_1.Role.STAFF), grade_controller_1.getGradeRecap);
 router.get('/recap/export', (0, rbac_middleware_1.requireRoles)(client_1.Role.ADMIN, client_1.Role.GURU, client_1.Role.STAFF), grade_controller_1.exportGradeRecap);

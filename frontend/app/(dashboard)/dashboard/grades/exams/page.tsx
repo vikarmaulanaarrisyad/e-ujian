@@ -27,10 +27,12 @@ export default function ExamGradesPage() {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputAllRef = useRef<HTMLInputElement>(null);
 
   // Selected Subject State
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [importing, setImporting] = useState(false);
+  const [importingAll, setImportingAll] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -175,6 +177,69 @@ export default function ExamGradesPage() {
     }
   };
 
+  const handleExportAllExcel = async () => {
+    try {
+      const response = await api.get('/grades/exams/export-all', { responseType: 'blob' });
+      const fileName = `nilai_ujian_semua_mapel.xlsx`;
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      showToast('Template nilai ujian semua mapel berhasil diunduh.', 'success');
+    } catch (err: any) {
+      console.error(err);
+      showToast('Gagal mengekspor template nilai semua mapel.', 'error');
+    }
+  };
+
+  const handleExportGradesAllExcel = async () => {
+    try {
+      const response = await api.get('/grades/exams/export-all', { responseType: 'blob' });
+      const fileName = `ekspor_nilai_ujian_semua_mapel.xlsx`;
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      showToast('Ekspor nilai ujian semua mapel berhasil diunduh.', 'success');
+    } catch (err: any) {
+      console.error(err);
+      showToast('Gagal mengekspor nilai ujian semua mapel.', 'error');
+    }
+  };
+
+  const handleImportAllExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setImportingAll(true);
+      const res = await api.post('/grades/exams/import-all', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      showToast(res.data.message || 'Import nilai ujian semua mapel berhasil!', 'success');
+      queryClient.invalidateQueries({ queryKey: ['examGrades', selectedSubjectId] });
+      queryClient.invalidateQueries({ queryKey: ['recap'] });
+    } catch (err: any) {
+      console.error(err);
+      const msg = err.response?.data?.errors?.join('\n') || err.response?.data?.message || 'Gagal mengimpor file.';
+      showToast(msg, 'error');
+    } finally {
+      setImportingAll(false);
+      if (fileInputAllRef.current) fileInputAllRef.current.value = '';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header section */}
@@ -185,6 +250,46 @@ export default function ExamGradesPage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
+          {/* Batch Export & Import for All Subjects */}
+          <button
+            onClick={handleExportAllExcel}
+            className="px-4 py-2.5 bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-900/60 rounded-xl text-xs font-semibold text-indigo-300 flex items-center gap-2 cursor-pointer transition-all duration-200"
+          >
+            <Download className="w-4 h-4 text-indigo-400" />
+            <span>Unduh Template Semua Mapel</span>
+          </button>
+
+          <button
+            onClick={handleExportGradesAllExcel}
+            className="px-4 py-2.5 bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-800/50 rounded-xl text-xs font-semibold text-emerald-450 flex items-center gap-2 cursor-pointer transition-all duration-200"
+          >
+            <Download className="w-4 h-4 text-emerald-400" />
+            <span>Ekspor Nilai Ujian (Semua Mapel)</span>
+          </button>
+
+          {user?.role !== 'GURU' && (
+            <>
+              <input
+                type="file"
+                ref={fileInputAllRef}
+                onChange={handleImportAllExcel}
+                className="hidden"
+                accept=".xlsx, .xls"
+              />
+              <button
+                onClick={() => fileInputAllRef.current?.click()}
+                disabled={importingAll}
+                className="px-4 py-2.5 bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-900/60 rounded-xl text-xs font-semibold text-indigo-300 flex items-center gap-2 cursor-pointer transition-all duration-200 disabled:opacity-50"
+              >
+                <Upload className="w-4 h-4 text-indigo-400" />
+                <span>{importingAll ? 'Mengimpor...' : 'Impor Nilai Semua Mapel'}</span>
+              </button>
+            </>
+          )}
+
+          {/* Divider */}
+          <div className="h-9 w-px bg-slate-800 self-center hidden md:block"></div>
+
           {selectedSubjectId && (
             <button
               onClick={handleExportExcel}

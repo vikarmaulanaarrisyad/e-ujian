@@ -223,7 +223,7 @@ export const saveReportGrades = async (req: Request, res: Response, next: NextFu
 // Export Report template or existing grades for a Subject
 export const exportReportGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { subjectId } = req.query;
+    const { subjectId, semester } = req.query;
     if (!subjectId) {
       return res.status(400).json({ message: 'Subject ID is required' });
     }
@@ -237,6 +237,8 @@ export const exportReportGrades = async (req: Request, res: Response, next: Next
     if (!subject) {
       return res.status(404).json({ message: 'Subject not found' });
     }
+
+    const targetSemester = semester ? parseInt(String(semester)) : null;
 
     const students = await prisma.student.findMany({
       orderBy: { name: 'asc' },
@@ -258,16 +260,20 @@ export const exportReportGrades = async (req: Request, res: Response, next: Next
       { state: 'frozen', xSplit: 3, ySplit: 1 }
     ];
 
-    worksheet.columns = [
+    const baseColumns = [
       { key: 'nis', width: 15 },
       { key: 'nisn', width: 15 },
       { key: 'name', width: 30 },
-      { key: 'sem7', width: 12 },
-      { key: 'sem8', width: 12 },
-      { key: 'sem9', width: 12 },
-      { key: 'sem10', width: 12 },
-      { key: 'sem11', width: 12 },
     ];
+
+    if (targetSemester) {
+      baseColumns.push({ key: `sem${targetSemester}`, width: 12 });
+    } else {
+      for (let sem = 7; sem <= 11; sem++) {
+        baseColumns.push({ key: `sem${sem}`, width: 12 });
+      }
+    }
+    worksheet.columns = baseColumns;
 
     const headerBorder: Partial<ExcelJS.Borders> = {
       top: { style: 'thin', color: { argb: 'A0A0A0' } },
@@ -282,13 +288,18 @@ export const exportReportGrades = async (req: Request, res: Response, next: Next
     row1.getCell(1).value = 'NIS';
     row1.getCell(2).value = 'NISN';
     row1.getCell(3).value = 'Nama Lengkap';
-    row1.getCell(4).value = 'Semester 7';
-    row1.getCell(5).value = 'Semester 8';
-    row1.getCell(6).value = 'Semester 9';
-    row1.getCell(7).value = 'Semester 10';
-    row1.getCell(8).value = 'Semester 11';
 
-    for (let c = 1; c <= 8; c++) {
+    if (targetSemester) {
+      row1.getCell(4).value = `Smt ${targetSemester}`;
+    } else {
+      for (let sem = 7; sem <= 11; sem++) {
+        row1.getCell(4 + (sem - 7)).value = `Smt ${sem}`;
+      }
+    }
+
+    const totalCols = targetSemester ? 4 : 8;
+
+    for (let c = 1; c <= totalCols; c++) {
       const cell = row1.getCell(c);
       cell.font = { bold: true, color: { argb: 'FFFFFF' }, name: 'Arial', size: 11 };
       cell.fill = {
@@ -302,26 +313,32 @@ export const exportReportGrades = async (req: Request, res: Response, next: Next
     row1.getCell(3).alignment = { horizontal: 'left', vertical: 'middle' };
 
     // Hide unused columns
-    for (let col = 9; col <= 109; col++) {
+    for (let col = totalCols + 1; col <= totalCols + 101; col++) {
       worksheet.getColumn(col).hidden = true;
     }
 
     students.forEach((student) => {
-      const grades: Record<number, number | string> = { 7: '', 8: '', 9: '', 10: '', 11: '' };
-      student.reportGrades.forEach((g) => {
-        grades[g.semester] = g.score;
-      });
-
-      const newRow = worksheet.addRow({
+      const rowData: any = {
         nis: student.nis,
         nisn: student.nisn,
         name: student.name,
-        sem7: grades[7],
-        sem8: grades[8],
-        sem9: grades[9],
-        sem10: grades[10],
-        sem11: grades[11],
-      });
+      };
+
+      if (targetSemester) {
+        const matchingGrade = student.reportGrades.find(
+          (rg) => rg.semester === targetSemester
+        );
+        rowData[`sem${targetSemester}`] = matchingGrade ? matchingGrade.score : '';
+      } else {
+        for (let sem = 7; sem <= 11; sem++) {
+          const matchingGrade = student.reportGrades.find(
+            (rg) => rg.semester === sem
+          );
+          rowData[`sem${sem}`] = matchingGrade ? matchingGrade.score : '';
+        }
+      }
+
+      const newRow = worksheet.addRow(rowData);
       newRow.height = 20;
 
       // Add borders and formatting
@@ -344,7 +361,8 @@ export const exportReportGrades = async (req: Request, res: Response, next: Next
       });
     });
 
-    const fileName = `nilai_rapor_${subject.code.toLowerCase()}.xlsx`;
+    const fileSemesterSuffix = targetSemester ? `_smt_${targetSemester}` : '';
+    const fileName = `nilai_rapor_${subject.code.toLowerCase()}${fileSemesterSuffix}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
 
@@ -392,44 +410,53 @@ export const importReportGrades = async (req: Request, res: Response, next: Next
     const gradesToUpsert: any[] = [];
     const errors: string[] = [];
 
+    const semesterMap: Record<number, number> = {}; // maps colIndex to semester (7-11)
+    const headerRow = worksheet.getRow(1);
+    
+    for (let col = 4; col <= worksheet.columnCount; col++) {
+      const val = getCellValueAsString(headerRow.getCell(col));
+      if (val) {
+        const match = val.match(/\b(7|8|9|10|11)\b/);
+        if (match) {
+          semesterMap[col] = parseInt(match[1]);
+        }
+      }
+    }
+
+    // Fallback to default mapping if no semester column header is recognized
+    if (Object.keys(semesterMap).length === 0) {
+      for (let i = 0; i < 5; i++) {
+        semesterMap[4 + i] = 7 + i;
+      }
+    }
+
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return; // Skip headers
 
       const nis = getCellValueAsString(row.getCell(1));
       const name = getCellValueAsString(row.getCell(3));
-      const sem7Raw = row.getCell(4).value;
-      const sem8Raw = row.getCell(5).value;
-      const sem9Raw = row.getCell(6).value;
-      const sem10Raw = row.getCell(7).value;
-      const sem11Raw = row.getCell(8).value;
 
       if (!nis && !name) return;
 
-      const semGrades = [
-        { sem: 7, val: sem7Raw },
-        { sem: 8, val: sem8Raw },
-        { sem: 9, val: sem9Raw },
-        { sem: 10, val: sem10Raw },
-        { sem: 11, val: sem11Raw },
-      ];
-
-      for (const item of semGrades) {
-        if (item.val === null || item.val === undefined || item.val === '') {
-          continue; // Missing grade is fine, skip
+      Object.entries(semesterMap).forEach(([colIdxStr, sem]) => {
+        const colIdx = parseInt(colIdxStr);
+        const valRaw = row.getCell(colIdx).value;
+        if (valRaw === null || valRaw === undefined || String(valRaw).trim() === '') {
+          return; // Skip empty
         }
 
-        const score = Number(item.val);
+        const score = Number(valRaw);
         if (isNaN(score) || score < 0 || score > 100) {
-          errors.push(`Row ${rowNumber}: Semester ${item.sem} score must be a number between 0 and 100.`);
+          errors.push(`Row ${rowNumber}: Semester ${sem} score must be a number between 0 and 100.`);
           return;
         }
 
         gradesToUpsert.push({
           nis,
-          semester: item.sem,
+          semester: sem,
           score,
         });
-      }
+      });
     });
 
     if (errors.length > 0) {
@@ -856,7 +883,7 @@ export const getGradeRecap = async (req: Request, res: Response, next: NextFunct
 
     // Fetch all subjects to make sure our list is complete
     const subjects = await prisma.subject.findMany({
-      orderBy: [{ group: 'asc' }, { name: 'asc' }],
+      orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
     });
 
     const recap = students.map((student) => {
@@ -932,6 +959,14 @@ export const getGradeRecap = async (req: Request, res: Response, next: NextFunct
       };
     });
 
+    // Sort in-place by rank ascending, and alphabetically if ranks are equal
+    recapWithRank.sort((a, b) => {
+      if (a.rank !== b.rank) {
+        return a.rank - b.rank;
+      }
+      return a.studentName.localeCompare(b.studentName);
+    });
+
     return res.status(200).json({
       academicYear: {
         id: activeYear.id,
@@ -972,7 +1007,7 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
     });
 
     const subjects = await prisma.subject.findMany({
-      orderBy: [{ group: 'asc' }, { name: 'asc' }],
+      orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
     });
 
     const recapRaw = students.map((student) => {
@@ -1035,6 +1070,14 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
         ...student,
         rank: rankIndex + 1
       };
+    });
+
+    // Sort in-place by rank ascending, and alphabetically if ranks are equal
+    recapWithRank.sort((a, b) => {
+      if (a.rank !== b.rank) {
+        return a.rank - b.rank;
+      }
+      return a.studentName.localeCompare(b.studentName);
     });
 
     const workbook = new ExcelJS.Workbook();
@@ -1157,7 +1200,7 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
 export const getSubjects = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const subjects = await prisma.subject.findMany({
-      orderBy: [{ group: 'asc' }, { name: 'asc' }],
+      orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
     });
     return res.status(200).json(subjects);
   } catch (error) {
@@ -1168,6 +1211,7 @@ export const getSubjects = async (req: Request, res: Response, next: NextFunctio
 // Export Report template or existing grades for ALL Subjects
 export const exportAllReportGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { semester } = req.query;
     const activeYear = await getActiveYear();
     if (!activeYear) {
       return res.status(404).json({ message: 'No active academic year found' });
@@ -1176,9 +1220,12 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
     const subjects = await prisma.subject.findMany({
       orderBy: [
         { group: 'asc' },
+        { order: 'asc' },
         { name: 'asc' }
       ]
     });
+
+    const targetSemester = semester ? parseInt(String(semester)) : null;
 
     const students = await prisma.student.findMany({
       orderBy: { name: 'asc' },
@@ -1206,13 +1253,20 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
       { key: 'name', width: 30 }
     ];
 
-    // Add 5 columns for each subject
+    // Add columns for each subject
     subjects.forEach((subj) => {
-      for (let sem = 7; sem <= 11; sem++) {
+      if (targetSemester) {
         columns.push({
-          key: `${subj.code}_sem${sem}`,
-          width: 10
+          key: `${subj.code}_sem${targetSemester}`,
+          width: 12
         });
+      } else {
+        for (let sem = 7; sem <= 11; sem++) {
+          columns.push({
+            key: `${subj.code}_sem${sem}`,
+            width: 10
+          });
+        }
       }
     });
 
@@ -1226,18 +1280,31 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
     row1.getCell(3).value = 'Nama Lengkap';
 
     subjects.forEach((subj, i) => {
-      const startCol = 4 + i * 5;
-      const endCol = startCol + 4;
-      worksheet.mergeCells(1, startCol, 1, endCol);
-      const cell = row1.getCell(startCol);
-      cell.value = `[${subj.code}] ${subj.name}`;
-      cell.font = { bold: true, color: { argb: 'FFFFFF' }, name: 'Arial', size: 11 };
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: '1F497D' } // Navy blue
-      };
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      if (targetSemester) {
+        const colIdx = 4 + i;
+        const cell = row1.getCell(colIdx);
+        cell.value = `[${subj.code}] ${subj.name}`;
+        cell.font = { bold: true, color: { argb: 'FFFFFF' }, name: 'Arial', size: 11 };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: '1F497D' } // Navy blue
+        };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      } else {
+        const startCol = 4 + i * 5;
+        const endCol = startCol + 4;
+        worksheet.mergeCells(1, startCol, 1, endCol);
+        const cell = row1.getCell(startCol);
+        cell.value = `[${subj.code}] ${subj.name}`;
+        cell.font = { bold: true, color: { argb: 'FFFFFF' }, name: 'Arial', size: 11 };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: '1F497D' } // Navy blue
+        };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      }
     });
 
     // Style NIS, NISN, Nama headers on Row 1
@@ -1260,11 +1327,10 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
     row2.getCell(3).value = '';
 
     subjects.forEach((subj, i) => {
-      const startCol = 4 + i * 5;
-      for (let sem = 7; sem <= 11; sem++) {
-        const colIdx = startCol + (sem - 7);
+      if (targetSemester) {
+        const colIdx = 4 + i;
         const cell = row2.getCell(colIdx);
-        cell.value = `Smt ${sem}`;
+        cell.value = `Smt ${targetSemester}`;
         cell.font = { bold: true, color: { argb: 'FFFFFF' }, name: 'Arial', size: 10 };
         cell.fill = {
           type: 'pattern',
@@ -1272,6 +1338,20 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
           fgColor: { argb: '5B9BD5' } // Lighter blue
         };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      } else {
+        const startCol = 4 + i * 5;
+        for (let sem = 7; sem <= 11; sem++) {
+          const colIdx = startCol + (sem - 7);
+          const cell = row2.getCell(colIdx);
+          cell.value = `Smt ${sem}`;
+          cell.font = { bold: true, color: { argb: 'FFFFFF' }, name: 'Arial', size: 10 };
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: '5B9BD5' } // Lighter blue
+          };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        }
       }
     });
 
@@ -1286,7 +1366,7 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
     }
 
     // Apply borders to all active cells in Row 1 and Row 2 (including merged ones)
-    const totalCols = 3 + subjects.length * 5;
+    const totalCols = targetSemester ? (3 + subjects.length) : (3 + subjects.length * 5);
     const headerBorder: Partial<ExcelJS.Borders> = {
       top: { style: 'thin', color: { argb: 'A0A0A0' } },
       left: { style: 'thin', color: { argb: 'A0A0A0' } },
@@ -1314,11 +1394,18 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
 
       // Map existing grades
       subjects.forEach((subj) => {
-        for (let sem = 7; sem <= 11; sem++) {
+        if (targetSemester) {
           const matchingGrade = student.reportGrades.find(
-            (rg) => rg.subjectId === subj.id && rg.semester === sem
+            (rg) => rg.subjectId === subj.id && rg.semester === targetSemester
           );
-          rowData[`${subj.code}_sem${sem}`] = matchingGrade ? matchingGrade.score : '';
+          rowData[`${subj.code}_sem${targetSemester}`] = matchingGrade ? matchingGrade.score : '';
+        } else {
+          for (let sem = 7; sem <= 11; sem++) {
+            const matchingGrade = student.reportGrades.find(
+              (rg) => rg.subjectId === subj.id && rg.semester === sem
+            );
+            rowData[`${subj.code}_sem${sem}`] = matchingGrade ? matchingGrade.score : '';
+          }
         }
       });
 
@@ -1345,6 +1432,9 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
       });
     });
 
+    const fileSemesterSuffix = targetSemester ? `_smt_${targetSemester}` : '';
+    const fileName = `nilai_rapor_semua_mapel${fileSemesterSuffix}.xlsx`;
+
     // Write file to response
     res.setHeader(
       'Content-Type',
@@ -1352,7 +1442,7 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
     );
     res.setHeader(
       'Content-Disposition',
-      'attachment; filename=nilai_rapor_semua_mapel.xlsx'
+      `attachment; filename=${fileName}`
     );
 
     await workbook.xlsx.write(res);
@@ -1387,27 +1477,28 @@ export const importAllReportGrades = async (req: Request, res: Response, next: N
     const subjects = await prisma.subject.findMany();
     const colToSubjectId: Record<number, string> = {};
 
-    // Scan Row 1 cells to map column indices to subjectIds
+    // Scan Row 1 cells to map column indices to subjectIds dynamically
     const row1 = worksheet.getRow(1);
-    subjects.forEach((subj) => {
-      for (let col = 4; col <= worksheet.columnCount; col++) {
-        const val = row1.getCell(col).value;
-        if (val) {
-          const valStr = String(val).trim().toLowerCase();
-          if (
+    let currentSubjectId: string | null = null;
+
+    for (let col = 4; col <= worksheet.columnCount; col++) {
+      const val = row1.getCell(col).value;
+      if (val) {
+        const valStr = String(val).trim().toLowerCase();
+        const foundSubj = subjects.find(
+          (subj) =>
             valStr === subj.name.trim().toLowerCase() ||
             valStr.includes(subj.code.trim().toLowerCase()) ||
             valStr.includes(subj.name.trim().toLowerCase())
-          ) {
-            // Found subject column start! Map next 5 columns to this subject
-            for (let offset = 0; offset < 5; offset++) {
-              colToSubjectId[col + offset] = subj.id;
-            }
-            break;
-          }
+        );
+        if (foundSubj) {
+          currentSubjectId = foundSubj.id;
         }
       }
-    });
+      if (currentSubjectId) {
+        colToSubjectId[col] = currentSubjectId;
+      }
+    }
 
     const parseSemester = (val: any): number | null => {
       if (!val) return null;
@@ -1514,6 +1605,287 @@ export const importAllReportGrades = async (req: Request, res: Response, next: N
 
     return res.status(200).json({
       message: `Successfully imported ${savedCount} report card grades for all subjects.`,
+    });
+  } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    next(error);
+  }
+};
+
+// Export Exam template or existing grades for ALL Subjects
+export const exportAllExamGrades = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const activeYear = await getActiveYear();
+    if (!activeYear) {
+      return res.status(404).json({ message: 'No active academic year found' });
+    }
+
+    const subjects = await prisma.subject.findMany({
+      orderBy: [
+        { group: 'asc' },
+        { order: 'asc' },
+        { name: 'asc' }
+      ]
+    });
+
+    const students = await prisma.student.findMany({
+      orderBy: { name: 'asc' },
+      include: {
+        examGrades: {
+          where: {
+            academicYearId: activeYear.id
+          }
+        }
+      }
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Nilai Ujian Semua Mapel');
+
+    // Freeze A-C (NIS, NISN, Name) and the header row
+    worksheet.views = [
+      { state: 'frozen', xSplit: 3, ySplit: 1 }
+    ];
+
+    // Define base columns
+    const columns: any[] = [
+      { key: 'nis', width: 15 },
+      { key: 'nisn', width: 15 },
+      { key: 'name', width: 30 }
+    ];
+
+    // Add 1 column for each subject
+    subjects.forEach((subj) => {
+      columns.push({
+        key: `sub_${subj.id}`,
+        width: 15
+      });
+    });
+
+    worksheet.columns = columns;
+
+    const row1 = worksheet.getRow(1);
+    row1.height = 30;
+    row1.getCell(1).value = 'NIS';
+    row1.getCell(2).value = 'NISN';
+    row1.getCell(3).value = 'Nama Lengkap';
+
+    subjects.forEach((subj, i) => {
+      const colNum = 4 + i;
+      row1.getCell(colNum).value = subj.code;
+    });
+
+    const headerBorder: Partial<ExcelJS.Borders> = {
+      top: { style: 'thin', color: { argb: 'A0A0A0' } },
+      left: { style: 'thin', color: { argb: 'A0A0A0' } },
+      bottom: { style: 'thin', color: { argb: 'A0A0A0' } },
+      right: { style: 'thin', color: { argb: 'A0A0A0' } }
+    };
+
+    const totalCols = 3 + subjects.length;
+
+    for (let c = 1; c <= totalCols; c++) {
+      const cell = row1.getCell(c);
+      cell.font = { bold: true, color: { argb: 'FFFFFF' }, name: 'Arial', size: 11 };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: '1F497D' }
+      };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = headerBorder;
+    }
+    row1.getCell(3).alignment = { horizontal: 'left', vertical: 'middle' };
+
+    // Hide all unused columns to the right
+    for (let col = totalCols + 1; col <= totalCols + 100; col++) {
+      worksheet.getColumn(col).hidden = true;
+    }
+
+    // Add Student Rows
+    students.forEach((student) => {
+      const rowData: any = {
+        nis: student.nis,
+        nisn: student.nisn,
+        name: student.name
+      };
+
+      subjects.forEach((subj) => {
+        const matchingGrade = student.examGrades.find(
+          (eg) => eg.subjectId === subj.id
+        );
+        rowData[`sub_${subj.id}`] = matchingGrade ? matchingGrade.score : '';
+      });
+
+      const newRow = worksheet.addRow(rowData);
+      newRow.height = 20;
+
+      // Add borders and formatting
+      newRow.eachCell((cell, colNumber) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'D9D9D9' } },
+          left: { style: 'thin', color: { argb: 'D9D9D9' } },
+          bottom: { style: 'thin', color: { argb: 'D9D9D9' } },
+          right: { style: 'thin', color: { argb: 'D9D9D9' } }
+        };
+
+        if (colNumber > 3) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else {
+          cell.alignment = { vertical: 'middle' };
+          if (colNumber <= 2) {
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          }
+        }
+      });
+    });
+
+    const fileName = `nilai_ujian_semua_mapel.xlsx`;
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${fileName}"`
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Import Exam grades for ALL Subjects
+export const importAllExamGrades = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No Excel file uploaded' });
+    }
+
+    const activeYear = await getActiveYear();
+    if (!activeYear) {
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({ message: 'No active academic year found' });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(req.file.path);
+    const worksheet = workbook.getWorksheet(1);
+
+    if (!worksheet) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ message: 'Worksheet not found' });
+    }
+
+    const subjects = await prisma.subject.findMany();
+    const colToSubjectId: Record<number, string> = {};
+
+    // Scan Row 1 cells to map column indices to subjectIds
+    const row1 = worksheet.getRow(1);
+    for (let col = 4; col <= worksheet.columnCount; col++) {
+      const val = row1.getCell(col).value;
+      if (val) {
+        const valStr = String(val).trim().toLowerCase();
+        const matchedSub = subjects.find(
+          (subj) =>
+            valStr === subj.code.trim().toLowerCase() ||
+            valStr === subj.name.trim().toLowerCase() ||
+            valStr.includes(subj.code.trim().toLowerCase()) ||
+            valStr.includes(subj.name.trim().toLowerCase())
+        );
+        if (matchedSub) {
+          colToSubjectId[col] = matchedSub.id;
+        }
+      }
+    }
+
+    const gradesToUpsert: any[] = [];
+    const errors: string[] = [];
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber <= 1) return; // Skip header row
+
+      const nis = getCellValueAsString(row.getCell(1));
+      const name = getCellValueAsString(row.getCell(3));
+
+      if (!nis && !name) return; // Empty row, skip
+
+      // Iterate through columns starting from column 4
+      for (let col = 4; col <= worksheet.columnCount; col++) {
+        const cellValue = row.getCell(col).value;
+        if (cellValue === null || cellValue === undefined || String(cellValue).trim() === '') {
+          continue; // Empty grade is fine, skip
+        }
+
+        const subjectId = colToSubjectId[col];
+        if (!subjectId) {
+          continue; // Not a mapped grade column, skip
+        }
+
+        const score = Number(cellValue);
+        if (isNaN(score) || score < 0 || score > 100) {
+          const subjName = subjects.find(s => s.id === subjectId)?.name || 'Unknown';
+          errors.push(`Row ${rowNumber}: Subject '${subjName}' exam score must be a number between 0 and 100.`);
+          continue;
+        }
+
+        gradesToUpsert.push({
+          nis,
+          subjectId,
+          score,
+        });
+      }
+    });
+
+    if (errors.length > 0) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ message: 'Excel parsing validation errors', errors });
+    }
+
+    let savedCount = 0;
+    const dbErrors: string[] = [];
+
+    await prisma.$transaction(async (tx) => {
+      for (const item of gradesToUpsert) {
+        const student = await tx.student.findUnique({ where: { nis: item.nis } });
+        if (!student) {
+          throw new Error(`Student with NIS '${item.nis}' not found in the database.`);
+        }
+
+        await tx.examGrade.upsert({
+          where: {
+            studentId_subjectId_academicYearId: {
+              studentId: student.id,
+              subjectId: item.subjectId,
+              academicYearId: activeYear.id,
+            },
+          },
+          update: { score: item.score },
+          create: {
+            studentId: student.id,
+            subjectId: item.subjectId,
+            academicYearId: activeYear.id,
+            score: item.score,
+          },
+        });
+        savedCount++;
+      }
+    }).catch((err) => {
+      dbErrors.push(err.message);
+    });
+
+    fs.unlinkSync(req.file.path);
+
+    if (dbErrors.length > 0) {
+      return res.status(400).json({ message: 'Import failed', errors: dbErrors });
+    }
+
+    return res.status(200).json({
+      message: `Successfully imported ${savedCount} exam grades for all subjects.`,
     });
   } catch (error) {
     if (req.file && fs.existsSync(req.file.path)) {

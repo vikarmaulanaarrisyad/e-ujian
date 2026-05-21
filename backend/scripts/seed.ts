@@ -95,23 +95,23 @@ async function main() {
   console.log('Seeding subjects...');
   const subjectsData = [
     // Kelompok A (Nasional)
-    { name: 'Pendidikan Pancasila dan Kewarganegaraan', code: 'PPKN', group: SubjectGroup.KELOMPOK_A },
-    { name: 'Bahasa Indonesia', code: 'BINDO', group: SubjectGroup.KELOMPOK_A },
-    { name: 'Matematika', code: 'MTK', group: SubjectGroup.KELOMPOK_A },
-    { name: 'Ilmu Pengetahuan Alam', code: 'IPA', group: SubjectGroup.KELOMPOK_A },
-    { name: 'Ilmu Pengetahuan Sosial', code: 'IPS', group: SubjectGroup.KELOMPOK_A },
+    { name: 'Pendidikan Pancasila dan Kewarganegaraan', code: 'PPKN', group: SubjectGroup.KELOMPOK_A, order: 1 },
+    { name: 'Bahasa Indonesia', code: 'BINDO', group: SubjectGroup.KELOMPOK_A, order: 2 },
+    { name: 'Matematika', code: 'MTK', group: SubjectGroup.KELOMPOK_A, order: 3 },
+    { name: 'Ilmu Pengetahuan Alam', code: 'IPA', group: SubjectGroup.KELOMPOK_A, order: 4 },
+    { name: 'Ilmu Pengetahuan Sosial', code: 'IPS', group: SubjectGroup.KELOMPOK_A, order: 5 },
 
     // Kelompok B (Muatan Lokal / Umum)
-    { name: 'Seni Budaya dan Prakarya', code: 'SBDP', group: SubjectGroup.KELOMPOK_B },
-    { name: 'Pendidikan Jasmani Olahraga dan Kesehatan', code: 'PJOK', group: SubjectGroup.KELOMPOK_B },
-    { name: 'Bahasa Daerah (Jawa/Madura)', code: 'BDER', group: SubjectGroup.KELOMPOK_B },
+    { name: 'Seni Budaya dan Prakarya', code: 'SBDP', group: SubjectGroup.KELOMPOK_B, order: 1 },
+    { name: 'Pendidikan Jasmani Olahraga dan Kesehatan', code: 'PJOK', group: SubjectGroup.KELOMPOK_B, order: 2 },
+    { name: 'Bahasa Daerah (Jawa/Madura)', code: 'BDER', group: SubjectGroup.KELOMPOK_B, order: 3 },
 
     // Kelompok C (Ciri Khas Madrasah)
-    { name: 'Al-Qur\'an Hadits', code: 'ALQURAN_HADITS', group: SubjectGroup.KELOMPOK_C },
-    { name: 'Akidah Akhlak', code: 'AKIDAH_AKHLAK', group: SubjectGroup.KELOMPOK_C },
-    { name: 'Fikih', code: 'FIKIH', group: SubjectGroup.KELOMPOK_C },
-    { name: 'Sejarah Kebudayaan Islam', code: 'SKI', group: SubjectGroup.KELOMPOK_C },
-    { name: 'Bahasa Arab', code: 'BARAB', group: SubjectGroup.KELOMPOK_C },
+    { name: 'Al-Qur\'an Hadits', code: 'ALQURAN_HADITS', group: SubjectGroup.KELOMPOK_C, order: 1 },
+    { name: 'Akidah Akhlak', code: 'AKIDAH_AKHLAK', group: SubjectGroup.KELOMPOK_C, order: 2 },
+    { name: 'Fikih', code: 'FIKIH', group: SubjectGroup.KELOMPOK_C, order: 3 },
+    { name: 'Sejarah Kebudayaan Islam', code: 'SKI', group: SubjectGroup.KELOMPOK_C, order: 4 },
+    { name: 'Bahasa Arab', code: 'BARAB', group: SubjectGroup.KELOMPOK_C, order: 5 },
   ];
 
   for (const sub of subjectsData) {

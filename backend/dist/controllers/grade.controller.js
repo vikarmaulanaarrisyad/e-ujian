@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.importAllReportGrades = exports.exportAllReportGrades = exports.getSubjects = exports.exportGradeRecap = exports.getGradeRecap = exports.importExamGrades = exports.exportExamGrades = exports.saveExamGrades = exports.getExamGrades = exports.importReportGrades = exports.exportReportGrades = exports.saveReportGrades = exports.getReportGrades = exports.updateGradeWeight = exports.getGradeWeight = void 0;
+exports.importAllExamGrades = exports.exportAllExamGrades = exports.importAllReportGrades = exports.exportAllReportGrades = exports.getSubjects = exports.exportGradeRecap = exports.getGradeRecap = exports.importExamGrades = exports.exportExamGrades = exports.saveExamGrades = exports.getExamGrades = exports.importReportGrades = exports.exportReportGrades = exports.saveReportGrades = exports.getReportGrades = exports.updateGradeWeight = exports.getGradeWeight = void 0;
 const exceljs_1 = __importDefault(require("exceljs"));
 const db_1 = __importDefault(require("../db"));
 const grade_validator_1 = require("../validators/grade.validator");
@@ -765,7 +765,7 @@ const getGradeRecap = async (req, res, next) => {
         });
         // Fetch all subjects to make sure our list is complete
         const subjects = await db_1.default.subject.findMany({
-            orderBy: [{ group: 'asc' }, { name: 'asc' }],
+            orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
         });
         const recap = students.map((student) => {
             // Group student report card grades by subjectId and compute average
@@ -866,7 +866,7 @@ const exportGradeRecap = async (req, res, next) => {
             },
         });
         const subjects = await db_1.default.subject.findMany({
-            orderBy: [{ group: 'asc' }, { name: 'asc' }],
+            orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
         });
         const recapRaw = students.map((student) => {
             const reportGradesBySubject = {};
@@ -1021,7 +1021,7 @@ exports.exportGradeRecap = exportGradeRecap;
 const getSubjects = async (req, res, next) => {
     try {
         const subjects = await db_1.default.subject.findMany({
-            orderBy: [{ group: 'asc' }, { name: 'asc' }],
+            orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
         });
         return res.status(200).json(subjects);
     }
@@ -1040,6 +1040,7 @@ const exportAllReportGrades = async (req, res, next) => {
         const subjects = await db_1.default.subject.findMany({
             orderBy: [
                 { group: 'asc' },
+                { order: 'asc' },
                 { name: 'asc' }
             ]
         });
@@ -1338,3 +1339,238 @@ const importAllReportGrades = async (req, res, next) => {
     }
 };
 exports.importAllReportGrades = importAllReportGrades;
+// Export Exam template or existing grades for ALL Subjects
+const exportAllExamGrades = async (req, res, next) => {
+    try {
+        const activeYear = await getActiveYear();
+        if (!activeYear) {
+            return res.status(404).json({ message: 'No active academic year found' });
+        }
+        const subjects = await db_1.default.subject.findMany({
+            orderBy: [
+                { group: 'asc' },
+                { order: 'asc' },
+                { name: 'asc' }
+            ]
+        });
+        const students = await db_1.default.student.findMany({
+            orderBy: { name: 'asc' },
+            include: {
+                examGrades: {
+                    where: {
+                        academicYearId: activeYear.id
+                    }
+                }
+            }
+        });
+        const workbook = new exceljs_1.default.Workbook();
+        const worksheet = workbook.addWorksheet('Nilai Ujian Semua Mapel');
+        // Freeze A-C (NIS, NISN, Name) and the header row
+        worksheet.views = [
+            { state: 'frozen', xSplit: 3, ySplit: 1 }
+        ];
+        // Define base columns
+        const columns = [
+            { key: 'nis', width: 15 },
+            { key: 'nisn', width: 15 },
+            { key: 'name', width: 30 }
+        ];
+        // Add 1 column for each subject
+        subjects.forEach((subj) => {
+            columns.push({
+                key: `sub_${subj.id}`,
+                width: 15
+            });
+        });
+        worksheet.columns = columns;
+        const row1 = worksheet.getRow(1);
+        row1.height = 30;
+        row1.getCell(1).value = 'NIS';
+        row1.getCell(2).value = 'NISN';
+        row1.getCell(3).value = 'Nama Lengkap';
+        subjects.forEach((subj, i) => {
+            const colNum = 4 + i;
+            row1.getCell(colNum).value = subj.code;
+        });
+        const headerBorder = {
+            top: { style: 'thin', color: { argb: 'A0A0A0' } },
+            left: { style: 'thin', color: { argb: 'A0A0A0' } },
+            bottom: { style: 'thin', color: { argb: 'A0A0A0' } },
+            right: { style: 'thin', color: { argb: 'A0A0A0' } }
+        };
+        const totalCols = 3 + subjects.length;
+        for (let c = 1; c <= totalCols; c++) {
+            const cell = row1.getCell(c);
+            cell.font = { bold: true, color: { argb: 'FFFFFF' }, name: 'Arial', size: 11 };
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: '1F497D' }
+            };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = headerBorder;
+        }
+        row1.getCell(3).alignment = { horizontal: 'left', vertical: 'middle' };
+        // Hide all unused columns to the right
+        for (let col = totalCols + 1; col <= totalCols + 100; col++) {
+            worksheet.getColumn(col).hidden = true;
+        }
+        // Add Student Rows
+        students.forEach((student) => {
+            const rowData = {
+                nis: student.nis,
+                nisn: student.nisn,
+                name: student.name
+            };
+            subjects.forEach((subj) => {
+                const matchingGrade = student.examGrades.find((eg) => eg.subjectId === subj.id);
+                rowData[`sub_${subj.id}`] = matchingGrade ? matchingGrade.score : '';
+            });
+            const newRow = worksheet.addRow(rowData);
+            newRow.height = 20;
+            // Add borders and formatting
+            newRow.eachCell((cell, colNumber) => {
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'D9D9D9' } },
+                    left: { style: 'thin', color: { argb: 'D9D9D9' } },
+                    bottom: { style: 'thin', color: { argb: 'D9D9D9' } },
+                    right: { style: 'thin', color: { argb: 'D9D9D9' } }
+                };
+                if (colNumber > 3) {
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                }
+                else {
+                    cell.alignment = { vertical: 'middle' };
+                    if (colNumber <= 2) {
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    }
+                }
+            });
+        });
+        const fileName = `nilai_ujian_semua_mapel.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        await workbook.xlsx.write(res);
+        res.end();
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.exportAllExamGrades = exportAllExamGrades;
+// Import Exam grades for ALL Subjects
+const importAllExamGrades = async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No Excel file uploaded' });
+        }
+        const activeYear = await getActiveYear();
+        if (!activeYear) {
+            fs_1.default.unlinkSync(req.file.path);
+            return res.status(404).json({ message: 'No active academic year found' });
+        }
+        const workbook = new exceljs_1.default.Workbook();
+        await workbook.xlsx.readFile(req.file.path);
+        const worksheet = workbook.getWorksheet(1);
+        if (!worksheet) {
+            fs_1.default.unlinkSync(req.file.path);
+            return res.status(400).json({ message: 'Worksheet not found' });
+        }
+        const subjects = await db_1.default.subject.findMany();
+        const colToSubjectId = {};
+        // Scan Row 1 cells to map column indices to subjectIds
+        const row1 = worksheet.getRow(1);
+        for (let col = 4; col <= worksheet.columnCount; col++) {
+            const val = row1.getCell(col).value;
+            if (val) {
+                const valStr = String(val).trim().toLowerCase();
+                const matchedSub = subjects.find((subj) => valStr === subj.code.trim().toLowerCase() ||
+                    valStr === subj.name.trim().toLowerCase() ||
+                    valStr.includes(subj.code.trim().toLowerCase()) ||
+                    valStr.includes(subj.name.trim().toLowerCase()));
+                if (matchedSub) {
+                    colToSubjectId[col] = matchedSub.id;
+                }
+            }
+        }
+        const gradesToUpsert = [];
+        const errors = [];
+        worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber <= 1)
+                return; // Skip header row
+            const nis = getCellValueAsString(row.getCell(1));
+            const name = getCellValueAsString(row.getCell(3));
+            if (!nis && !name)
+                return; // Empty row, skip
+            // Iterate through columns starting from column 4
+            for (let col = 4; col <= worksheet.columnCount; col++) {
+                const cellValue = row.getCell(col).value;
+                if (cellValue === null || cellValue === undefined || String(cellValue).trim() === '') {
+                    continue; // Empty grade is fine, skip
+                }
+                const subjectId = colToSubjectId[col];
+                if (!subjectId) {
+                    continue; // Not a mapped grade column, skip
+                }
+                const score = Number(cellValue);
+                if (isNaN(score) || score < 0 || score > 100) {
+                    const subjName = subjects.find(s => s.id === subjectId)?.name || 'Unknown';
+                    errors.push(`Row ${rowNumber}: Subject '${subjName}' exam score must be a number between 0 and 100.`);
+                    continue;
+                }
+                gradesToUpsert.push({
+                    nis,
+                    subjectId,
+                    score,
+                });
+            }
+        });
+        if (errors.length > 0) {
+            fs_1.default.unlinkSync(req.file.path);
+            return res.status(400).json({ message: 'Excel parsing validation errors', errors });
+        }
+        let savedCount = 0;
+        const dbErrors = [];
+        await db_1.default.$transaction(async (tx) => {
+            for (const item of gradesToUpsert) {
+                const student = await tx.student.findUnique({ where: { nis: item.nis } });
+                if (!student) {
+                    throw new Error(`Student with NIS '${item.nis}' not found in the database.`);
+                }
+                await tx.examGrade.upsert({
+                    where: {
+                        studentId_subjectId_academicYearId: {
+                            studentId: student.id,
+                            subjectId: item.subjectId,
+                            academicYearId: activeYear.id,
+                        },
+                    },
+                    update: { score: item.score },
+                    create: {
+                        studentId: student.id,
+                        subjectId: item.subjectId,
+                        academicYearId: activeYear.id,
+                        score: item.score,
+                    },
+                });
+                savedCount++;
+            }
+        }).catch((err) => {
+            dbErrors.push(err.message);
+        });
+        fs_1.default.unlinkSync(req.file.path);
+        if (dbErrors.length > 0) {
+            return res.status(400).json({ message: 'Import failed', errors: dbErrors });
+        }
+        return res.status(200).json({
+            message: `Successfully imported ${savedCount} exam grades for all subjects.`,
+        });
+    }
+    catch (error) {
+        if (req.file && fs_1.default.existsSync(req.file.path)) {
+            fs_1.default.unlinkSync(req.file.path);
+        }
+        next(error);
+    }
+};
+exports.importAllExamGrades = importAllExamGrades;

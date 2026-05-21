@@ -12,6 +12,8 @@ import {
   saveExamGrades,
   exportExamGrades,
   importExamGrades,
+  exportAllExamGrades,
+  importAllExamGrades,
   getGradeRecap,
   exportGradeRecap,
   getSubjects,
@@ -45,7 +47,9 @@ router.post('/reports/import-all', requireRoles(Role.ADMIN, Role.STAFF), upload.
 router.get('/exams', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getExamGrades);
 router.post('/exams', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), saveExamGrades);
 router.get('/exams/export', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), exportExamGrades);
+router.get('/exams/export-all', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), exportAllExamGrades);
 router.post('/exams/import', requireRoles(Role.ADMIN, Role.STAFF), upload.single('file'), importExamGrades);
+router.post('/exams/import-all', requireRoles(Role.ADMIN, Role.STAFF), upload.single('file'), importAllExamGrades);
 
 // Final calculated grade recap
 router.get('/recap', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getGradeRecap);
