@@ -85,22 +85,21 @@ export default function PrintIjazahPage() {
           font-family: "Times New Roman", Times, serif;
           position: relative;
         }
-        .kop-surat::after {
-          content: "";
-          position: absolute;
-          bottom: -5px;
-          left: 0;
-          right: 0;
-          border-bottom: 3px solid black;
-        }
-        .kop-surat::before {
-          content: "";
-          position: absolute;
-          bottom: -8px;
-          left: 0;
-          right: 0;
-          border-bottom: 1px solid black;
-        }
+        .kop-surat-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; font-family: "Times New Roman", Times, serif; }
+        .kop-surat-table td { vertical-align: middle; padding: 0; }
+        .kop-logo-td { width: 105px; text-align: left; }
+        .kop-logo-td img { width: 95px; height: 95px; object-fit: contain; }
+        .kop-logo-placeholder { width: 95px; height: 95px; border: 1.5px dashed #999; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #999; letter-spacing: 1px; text-align: center; line-height: 1.4; }
+        .kop-text-td { text-align: center; }
+        .kop-text-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+        .kop-right-spacer { width: 105px; }
+        .kop-line-yayasan { font-size: 16px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; line-height: 1.3; }
+        .kop-line-sekolah { font-size: 20px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; line-height: 1.2; margin: 2px 0 2px; }
+        .kop-line-akreditasi { font-size: 14px; font-weight: bold; letter-spacing: 0.3px; text-transform: uppercase; }
+        .kop-line-alamat { font-size: 13px; font-weight: normal; font-style: italic; line-height: 1.4; width: 100%; }
+        .kop-divider { margin-top: 2px; margin-bottom: 24px; }
+        .kop-divider-thick { height: 3px; background: #000; margin-bottom: 2px; }
+        .kop-divider-thin  { height: 1px; background: #000; }
         .ijazah-table th, .ijazah-table td {
           border: 1px solid black;
           padding: 6px 12px;
@@ -121,13 +120,32 @@ export default function PrintIjazahPage() {
       <div className="print-container">
         
         {/* Header Text */}
-        <div className="kop-surat relative text-center mb-8 pb-4">
-          <div className="flex-1 text-center px-4">
-            <h2 className="text-xl font-bold uppercase tracking-wider mb-1">YAYASAN BUSTANUL HUDA DAWUHAN</h2>
-            <h1 className="text-2xl font-extrabold uppercase tracking-widest mb-2">{schoolProfile.name || 'MI BUSTANUL HUDA 01 DAWUHAN'}</h1>
-            <p className="text-[13px] font-semibold mb-1">TERAKREDITASI A &nbsp;&nbsp; NPSN : {schoolProfile.npsn || '60713609'} &nbsp;&nbsp; NSM : 111233280040</p>
-            <p className="text-sm">{schoolProfile.address}</p>
-          </div>
+        <table className="kop-surat-table">
+          <tbody>
+            <tr>
+              <td className="kop-logo-td">
+                {schoolProfile.logoUrl
+                  ? <img src={schoolProfile.logoUrl} alt="Logo" crossOrigin="anonymous" />
+                  : <div className="kop-logo-placeholder">LOGO<br/>MADRASAH</div>
+                }
+              </td>
+              <td className="kop-text-td">
+                <div className="kop-text-inner">
+                  <span className="kop-line-yayasan">YAYASAN BUSTANUL HUDA DAWUHAN</span>
+                  <span className="kop-line-sekolah">{schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}</span>
+                  <span className="kop-line-akreditasi">
+                    TERAKREDITASI A NSM {schoolProfile.nsm || '111233280040'} NPSN {schoolProfile.npsn || '60713609'}
+                  </span>
+                  <span className="kop-line-alamat">Alamat : {schoolProfile.address}</span>
+                </div>
+              </td>
+              <td className="kop-right-spacer"></td>
+            </tr>
+          </tbody>
+        </table>
+        <div className="kop-divider">
+          <div className="kop-divider-thick" />
+          <div className="kop-divider-thin" />
         </div>
 
         {/* Student Biodata */}

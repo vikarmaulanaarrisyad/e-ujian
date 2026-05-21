@@ -25,7 +25,8 @@ import {
   Calendar,
   Loader2,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  AlertTriangle
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -122,7 +123,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2 bg-indigo-950/40 px-4 py-2 rounded-xl border border-indigo-900/50 shadow-inner">
               <Calendar className="w-5 h-5 text-indigo-400" />
               <div>
-                <p className="text-sm font-bold text-indigo-100">{stats.activeAcademicYear!.year}</p>
+                <p className="text-sm font-bold text-indigo-100">{stats?.activeAcademicYear?.year}</p>
                 <p className="text-[10px] text-indigo-300">Semester {currentSemester}</p>
               </div>
             </div>
@@ -236,7 +237,7 @@ export default function DashboardPage() {
                     dataKey="value"
                     stroke="none"
                     labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                   >
                     {genderData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />

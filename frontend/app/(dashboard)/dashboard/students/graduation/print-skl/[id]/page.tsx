@@ -1,15 +1,19 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import api from '@/lib/api';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 export default function PrintSKLPage() {
   const { id } = useParams();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchDoc = async () => {
@@ -25,13 +29,46 @@ export default function PrintSKLPage() {
     fetchDoc();
   }, [id]);
 
-  useEffect(() => {
-    if (data && !loading && !error) {
-      setTimeout(() => {
-        window.print();
-      }, 500);
+  const handleDownloadPdf = async () => {
+    if (!printRef.current) return;
+    
+    try {
+      setDownloading(true);
+      
+      const element = printRef.current;
+      
+      // html2canvas needs the element to be visible and correctly scaled
+      const canvas = await html2canvas(element, {
+        scale: 2, // Higher scale for better quality
+        useCORS: true, // To load images from different origins if needed
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      
+      // A4 dimensions: 210 x 297 mm
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      
+      const fileName = `SKL_${data?.student?.name || 'Siswa'}_${new Date().getFullYear()}.pdf`;
+      pdf.save(fileName);
+      
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      alert('Terjadi kesalahan saat mengunduh PDF.');
+    } finally {
+      setDownloading(false);
     }
-  }, [data, loading, error]);
+  };
 
   if (loading) {
     return (
@@ -55,164 +92,393 @@ export default function PrintSKLPage() {
 
   const { student, schoolProfile, academicYear } = data;
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('id-ID', {
+      day: 'numeric', month: 'long', year: 'numeric',
+    });
   };
 
-  // Determine SKL number: use assigned sklNumber or fallback placeholder
-  const sklNumber = student.sklNumber || `___/MI.BH/${new Date().getFullYear()}`;
+  const sklNumber = student.sklNumber || `........./MI.BH/${new Date().getFullYear()}`;
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{__html: `
-        @media print {
-          @page { size: A4 portrait; margin: 0; }
-          body { -webkit-print-color-adjust: exact; background: white; margin: 0; padding: 0; }
-          .print-container { padding: 2cm 2.5cm; }
-          .no-print { display: none !important; }
-        }
-        body { background: #e2e8f0; }
-        .print-container { 
-          background: white; 
-          width: 210mm; 
-          min-height: 297mm; 
-          margin: 20px auto; 
-          padding: 2cm 2.5cm;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-          color: black;
+      <style dangerouslySetInnerHTML={{ __html: `
+        @import url('https://fonts.googleapis.com/css2?family=Times+New+Roman:wght@400;700&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+          background: #cbd5e1;
           font-family: "Times New Roman", Times, serif;
-          position: relative;
         }
+
+        .page-wrapper {
+          background: white;
+          width: 210mm;
+          min-height: 297mm;
+          margin: 24px auto 80px;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+          position: relative;
+          color: #000;
+        }
+
+        .page-inner {
+          padding: 1.8cm 2cm 2cm;
+        }
+
+        /* ═══ KOP SURAT ═══ */
         .kop-surat {
-          border-bottom: 3px solid black;
+          display: flex;
+          align-items: stretch;
+          gap: 0;
+          margin-bottom: 0;
           padding-bottom: 10px;
-          margin-bottom: 25px;
+        }
+
+        .kop-logo-wrap {
+          width: 88px;
+          min-width: 88px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding-right: 10px;
+        }
+
+        .kop-logo-wrap img {
+          width: 80px;
+          height: 80px;
+          object-fit: contain;
+        }
+
+        .kop-logo-placeholder {
+          width: 80px;
+          height: 80px;
+          border: 1.5px dashed #999;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          color: #999;
+          letter-spacing: 1px;
+        }
+
+        .kop-logo-right {
+          width: 88px;
+          min-width: 88px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding-left: 10px;
+        }
+
+        .kop-text {
+          flex: 1;
           text-align: center;
-          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
         }
-        .kop-surat::after {
-          content: "";
-          position: absolute;
-          bottom: -5px;
-          left: 0;
-          right: 0;
-          border-bottom: 3px solid black;
+
+        .kop-instansi {
+          font-size: 11.5px;
+          font-weight: normal;
+          letter-spacing: 0.5px;
+          line-height: 1.4;
+          text-transform: uppercase;
+          color: #222;
         }
-        .kop-surat::before {
-          content: "";
-          position: absolute;
-          bottom: -8px;
-          left: 0;
-          right: 0;
-          border-bottom: 1px solid black;
+
+        .kop-yayasan {
+          font-size: 12.5px;
+          font-weight: bold;
+          letter-spacing: 0.5px;
+          line-height: 1.4;
+          text-transform: uppercase;
+          color: #000;
+        }
+
+        .kop-sekolah {
+          font-size: 22px;
+          font-weight: 900;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+          line-height: 1.2;
+          color: #000;
+          margin-top: 2px;
+          margin-bottom: 2px;
+        }
+
+        .kop-akreditasi {
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.3px;
+          color: #111;
+          margin-top: 1px;
+        }
+
+        .kop-alamat {
+          font-size: 11px;
+          font-weight: normal;
+          color: #222;
+          line-height: 1.5;
+          max-width: 380px;
+        }
+
+        /* Garis kop: tebal di atas, tipis di bawah */
+        .kop-divider {
+          margin-top: 10px;
+          border: none;
+        }
+        .kop-divider-thick {
+          height: 3.5px;
+          background: #000;
+          margin-bottom: 1.5px;
+        }
+        .kop-divider-thin {
+          height: 1px;
+          background: #000;
+        }
+
+        /* ═══ JUDUL SKL ═══ */
+        .skl-judul-wrap {
+          margin-top: 22px;
+          margin-bottom: 20px;
+          text-align: center;
+        }
+
+        .skl-judul {
+          font-size: 16px;
+          font-weight: bold;
+          text-transform: uppercase;
+          text-decoration: underline;
+          letter-spacing: 2px;
+          display: block;
+          margin-bottom: 5px;
+        }
+
+        .skl-nomor {
+          font-size: 13px;
+          letter-spacing: 0.3px;
+        }
+
+        /* ═══ BODY ═══ */
+        .skl-body {
+          font-size: 13px;
+          line-height: 1.85;
+          color: #000;
+        }
+
+        .skl-para {
+          text-align: justify;
+          margin-bottom: 12px;
+        }
+
+        .identity-table {
+          margin: 4px 0 16px 24px;
+          border-collapse: collapse;
+          width: calc(100% - 24px);
+        }
+
+        .identity-table td {
+          padding: 3px 0;
+          vertical-align: top;
+          font-size: 13px;
+        }
+
+        .identity-table .col-label { width: 195px; }
+        .identity-table .col-sep   { width: 16px; font-weight: normal; }
+        .identity-table .col-value { }
+
+        .lulus-stamp-wrap {
+          text-align: center;
+          margin: 18px 0 16px;
+        }
+
+        .lulus-stamp {
+          display: inline-block;
+          font-size: 26px;
+          font-weight: 900;
+          letter-spacing: 8px;
+          border: 2.5px solid #000;
+          padding: 10px 52px;
+          border-radius: 6px;
+        }
+
+        /* ═══ TANDA TANGAN ═══ */
+        .ttd-wrap {
+          margin-top: 28px;
+          display: flex;
+          justify-content: flex-end;
+        }
+
+        .ttd-block {
+          text-align: center;
+          width: 220px;
+          font-size: 13px;
+          line-height: 1.7;
+        }
+
+        .ttd-space {
+          height: 82px;
+        }
+
+        .ttd-name {
+          font-weight: bold;
+          text-decoration: underline;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        /* ═══ NO PRINT TOOLBAR ═══ */
+        .no-print {
+          position: fixed;
+          bottom: 0; left: 0; right: 0;
+          background: rgba(15, 23, 42, 0.97);
+          border-top: 1px solid rgba(99,102,241,0.3);
+          padding: 12px 28px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          z-index: 999;
+          font-family: ui-sans-serif, system-ui, sans-serif;
         }
       `}} />
 
-      {/* Floating back button for non-print view */}
-      <div className="fixed bottom-6 right-6 no-print">
-        <button onClick={() => window.close()} className="px-5 py-2.5 bg-slate-800 text-white rounded-xl shadow-xl hover:bg-slate-700 transition font-sans text-sm">
-          Tutup &amp; Kembali
-        </button>
+      {/* Floating Toolbar */}
+      <div className="no-print">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
+          <span style={{ color: '#94a3b8', fontSize: '13px' }}>
+            SKL — <strong style={{ color: '#e2e8f0' }}>{student.name}</strong>
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={handleDownloadPdf}
+            disabled={downloading}
+            style={{ padding: '8px 20px', background: downloading ? '#6366f1' : '#4f46e5', color: 'white', borderRadius: '10px', border: 'none', fontSize: '13px', fontWeight: '600', cursor: downloading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {downloading ? 'Menyiapkan PDF...' : 'Download PDF'}
+          </button>
+          <button
+            onClick={() => window.close()}
+            style={{ padding: '8px 20px', background: '#334155', color: '#e2e8f0', borderRadius: '10px', border: 'none', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+          >
+            Tutup
+          </button>
+        </div>
       </div>
 
-      <div className="print-container">
-        {/* KOP Surat */}
-        <div className="kop-surat">
-          <div className="flex items-center justify-between">
-            {/* Logo */}
-            <div className="w-24 h-24 shrink-0 relative flex items-center justify-center">
-              {schoolProfile.logoUrl ? (
-                <img src={schoolProfile.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
-              ) : (
-                <div className="w-full h-full border border-dashed border-gray-400 flex items-center justify-center">
-                  <span className="text-xs text-gray-400">LOGO</span>
+      {/* Document */}
+      <div className="flex justify-center w-full">
+        <div className="page-wrapper" ref={printRef}>
+          <div className="page-inner">
+
+            {/* ── KOP SURAT ── */}
+            <div className="kop-surat">
+              {/* Logo kiri */}
+              <div className="kop-logo-wrap">
+                {schoolProfile.logoUrl
+                  ? <img src={schoolProfile.logoUrl} alt="Logo Madrasah" crossOrigin="anonymous" />
+                  : <div className="kop-logo-placeholder">LOGO</div>
+                }
+              </div>
+
+              {/* Teks tengah */}
+              <div className="kop-text">
+                <span className="kop-yayasan">YAYASAN BUSTANUL HUDA DAWUHAN</span>
+                <span className="kop-sekolah">{schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01'}</span>
+                <span className="kop-akreditasi">
+                  Terakreditasi &ldquo;A&rdquo;&ensp;|&ensp;NPSN: {schoolProfile.npsn || '60713609'}&ensp;|&ensp;NSM: 111233280040
+                </span>
+                <span className="kop-alamat">{schoolProfile.address}</span>
+              </div>
+
+              {/* Sisi kanan — kosong untuk keseimbangan (bisa diisi logo Kemenag jika ada) */}
+              <div className="kop-logo-right">
+                <div className="kop-logo-placeholder" style={{ fontSize: '9px', color: '#bbb', borderColor: '#ddd' }}>
+                  KEMENAG
                 </div>
-              )}
+              </div>
             </div>
-            
-            <div className="flex-1 text-center px-4">
-              <h2 className="text-xl font-bold uppercase tracking-wider mb-1">YAYASAN BUSTANUL HUDA DAWUHAN</h2>
-              <h1 className="text-2xl font-extrabold uppercase tracking-widest mb-2">{schoolProfile.name || 'MI BUSTANUL HUDA 01 DAWUHAN'}</h1>
-              <p className="text-[13px] font-semibold mb-1">TERAKREDITASI A &nbsp;&nbsp; NPSN : {schoolProfile.npsn || '60713609'} &nbsp;&nbsp; NSM : 111233280040</p>
-              <p className="text-sm">{schoolProfile.address}</p>
+
+            {/* Garis pemisah kop */}
+            <div className="kop-divider">
+              <div className="kop-divider-thick" />
+              <div className="kop-divider-thin" />
             </div>
-            
-            {/* Empty space for balance */}
-            <div className="w-24 h-24 shrink-0"></div>
+
+            {/* ── JUDUL ── */}
+            <div className="skl-judul-wrap">
+              <span className="skl-judul">SURAT KETERANGAN LULUS</span>
+              <span className="skl-nomor">Nomor: {sklNumber}</span>
+            </div>
+
+            {/* ── BODY ── */}
+            <div className="skl-body">
+              <p className="skl-para">
+                Yang bertanda tangan di bawah ini, Kepala {schoolProfile.name || 'Madrasah Ibtidaiyah Bustanul Huda 01 Dawuhan'},
+                Kecamatan Tamanan, Kabupaten Bondowoso, Provinsi Jawa Timur, menerangkan
+                dengan sesungguhnya bahwa peserta didik yang tersebut di bawah ini:
+              </p>
+
+              <table className="identity-table">
+                <tbody>
+                  {[
+                    ['Nama Lengkap',              <strong style={{ textTransform: 'uppercase' }}>{student.name}</strong>],
+                    ['Tempat, Tanggal Lahir',     `${student.placeOfBirth || '-'}, ${formatDate(student.dateOfBirth)}`],
+                    ['Nama Orang Tua / Wali',     student.parentName || '-'],
+                    ['Nomor Induk Siswa (NIS)',   student.nis],
+                    ['Nomor Induk Siswa Nasional (NISN)', student.nisn],
+                  ].map(([label, value], i) => (
+                    <tr key={i}>
+                      <td className="col-label">{label}</td>
+                      <td className="col-sep">:</td>
+                      <td className="col-value">{value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <p className="skl-para">
+                telah mengikuti seluruh program pembelajaran dan berdasarkan hasil rapat Dewan
+                Guru {schoolProfile.name || 'Madrasah Ibtidaiyah Bustanul Huda 01'} tentang
+                Penetapan Kelulusan Peserta Didik Tahun Pelajaran {academicYear}, serta
+                memperhatikan pencapaian kompetensi peserta didik pada Kurikulum yang berlaku,
+                maka yang bersangkutan dinyatakan:
+              </p>
+
+              <div className="lulus-stamp-wrap">
+                <span className="lulus-stamp">L U L U S</span>
+              </div>
+
+              <p className="skl-para">
+                Surat Keterangan Lulus ini bersifat sementara dan dinyatakan berlaku sampai
+                dengan diterbitkannya Ijazah asli. Demikian Surat Keterangan Lulus ini dibuat
+                dengan sebenar-benarnya untuk dapat dipergunakan sebagaimana mestinya.
+              </p>
+            </div>
+
+            {/* ── TANDA TANGAN ── */}
+            <div className="ttd-wrap">
+              <div className="ttd-block">
+                <p>{schoolProfile.city || 'Bondowoso'}, {formatDate(student.graduationDate)}</p>
+                <p>Kepala Madrasah,</p>
+                <div className="ttd-space" />
+                <p className="ttd-name">{schoolProfile.headmaster}</p>
+                <p>NIP. {schoolProfile.headmasterNip || '–'}</p>
+              </div>
+            </div>
+
           </div>
         </div>
-
-        {/* Title */}
-        <div className="text-center mb-8">
-          <h3 className="text-xl font-bold uppercase underline mb-1">Surat Keterangan Lulus</h3>
-          <p className="text-sm">Nomor: {sklNumber}</p>
-        </div>
-
-        {/* Content */}
-        <div className="space-y-6 text-justify leading-relaxed text-[15px]">
-          <p>
-            Yang bertanda tangan di bawah ini, Kepala Madrasah Ibtidaiyah Bustanul Huda, 
-            menerangkan dengan sesungguhnya bahwa:
-          </p>
-
-          <table className="w-full ml-8 mb-6">
-            <tbody>
-              <tr className="align-top">
-                <td className="py-1.5 w-48">Nama Lengkap</td>
-                <td className="py-1.5 w-4">:</td>
-                <td className="py-1.5 font-bold uppercase">{student.name}</td>
-              </tr>
-              <tr className="align-top">
-                <td className="py-1.5">Tempat, Tanggal Lahir</td>
-                <td className="py-1.5">:</td>
-                <td className="py-1.5">{student.placeOfBirth || '-'}, {formatDate(student.dateOfBirth)}</td>
-              </tr>
-              <tr className="align-top">
-                <td className="py-1.5">Nama Orang Tua / Wali</td>
-                <td className="py-1.5">:</td>
-                <td className="py-1.5">{student.parentName || '-'}</td>
-              </tr>
-              <tr className="align-top">
-                <td className="py-1.5">Nomor Induk Siswa (NIS)</td>
-                <td className="py-1.5">:</td>
-                <td className="py-1.5">{student.nis}</td>
-              </tr>
-              <tr className="align-top">
-                <td className="py-1.5">Nomor Induk Siswa Nasional</td>
-                <td className="py-1.5">:</td>
-                <td className="py-1.5">{student.nisn}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <p>
-            Berdasarkan hasil rapat Dewan Guru Madrasah Ibtidaiyah Bustanul Huda tentang penetapan kelulusan tahun pelajaran {academicYear}, 
-            serta memperhatikan pencapaian hasil belajar peserta didik pada Kurikulum yang berlaku, maka siswa tersebut di atas dinyatakan:
-          </p>
-
-          <div className="text-center my-8">
-            <span className="text-3xl font-extrabold tracking-[0.25em] border-2 border-black px-12 py-3 rounded-lg inline-block">L U L U S</span>
-          </div>
-
-          <p>
-            Demikian Surat Keterangan Lulus ini dibuat dengan sebenarnya untuk dapat dipergunakan sebagaimana mestinya 
-            hingga diterbitkannya Ijazah asli.
-          </p>
-        </div>
-
-        {/* Signature */}
-        <div className="mt-20 flex justify-end">
-          <div className="w-64 text-center">
-            <p className="mb-1">{schoolProfile.city || 'Bondowoso'}, {formatDate(student.graduationDate || new Date().toISOString())}</p>
-            <p className="mb-24">Kepala Madrasah,</p>
-            <p className="font-bold underline uppercase">{schoolProfile.headmaster}</p>
-            <p>NIP. {schoolProfile.headmasterNip || '-'}</p>
-          </div>
-        </div>
-
       </div>
     </>
   );
 }
+

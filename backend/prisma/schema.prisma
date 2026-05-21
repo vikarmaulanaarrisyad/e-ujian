@@ -48,10 +48,13 @@ model SchoolProfile {
   id              String   @id @default(uuid())
   name            String
   npsn            String?  @unique
+  nsm             String?  @unique
   address         String   @db.Text
   headmaster      String   @map("headmaster_name")
   headmasterNip   String?  @map("headmaster_nip")
   city            String?  // Nama Daerah / Kabupaten
+  district        String?  // Kecamatan
+  province        String?  // Provinsi
   logoUrl         String?  @map("logo_url")
   sklNumberFormat String?  @map("skl_number_format") // Format nomor SKL, e.g. "B.{seq}/MI.BH/{year}"
   createdAt       DateTime @default(now())

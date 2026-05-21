@@ -10,7 +10,10 @@ import Image from 'next/image';
 interface SchoolProfile {
   name: string;
   npsn: string;
+  nsm: string;
   address: string;
+  district: string;
+  province: string;
   headmaster: string;
   headmasterNip: string;
   city: string;
@@ -25,7 +28,10 @@ export default function SchoolProfilePage() {
   const [profile, setProfile] = useState<SchoolProfile>({
     name: '',
     npsn: '',
+    nsm: '',
     address: '',
+    district: '',
+    province: '',
     headmaster: '',
     headmasterNip: '',
     city: '',
@@ -46,7 +52,10 @@ export default function SchoolProfilePage() {
         setProfile({
           name: data.name || '',
           npsn: data.npsn || '',
+          nsm: data.nsm || '',
           address: data.address || '',
+          district: data.district || '',
+          province: data.province || '',
           headmaster: data.headmaster || '',
           headmasterNip: data.headmasterNip || '',
           city: data.city || '',
@@ -86,7 +95,10 @@ export default function SchoolProfilePage() {
       const formData = new FormData();
       formData.append('name', profile.name);
       formData.append('npsn', profile.npsn);
+      formData.append('nsm', profile.nsm);
       formData.append('address', profile.address);
+      formData.append('district', profile.district);
+      formData.append('province', profile.province);
       formData.append('headmaster', profile.headmaster);
       formData.append('headmasterNip', profile.headmasterNip);
       formData.append('city', profile.city);
@@ -170,11 +182,44 @@ export default function SchoolProfilePage() {
                 </div>
 
                 <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">NSM (No. Statistik Madrasah)</label>
+                  <input
+                    type="text"
+                    value={profile.nsm}
+                    onChange={(e) => setProfile({ ...profile, nsm: e.target.value })}
+                    disabled={!isAdmin}
+                    className="block w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-50"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Kota / Kabupaten</label>
                   <input
                     type="text"
                     value={profile.city}
                     onChange={(e) => setProfile({ ...profile, city: e.target.value })}
+                    disabled={!isAdmin}
+                    className="block w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Kecamatan</label>
+                  <input
+                    type="text"
+                    value={profile.district}
+                    onChange={(e) => setProfile({ ...profile, district: e.target.value })}
+                    disabled={!isAdmin}
+                    className="block w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Provinsi</label>
+                  <input
+                    type="text"
+                    value={profile.province}
+                    onChange={(e) => setProfile({ ...profile, province: e.target.value })}
                     disabled={!isAdmin}
                     className="block w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-50"
                   />

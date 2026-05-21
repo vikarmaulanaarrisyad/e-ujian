@@ -26,12 +26,13 @@ import {
   useReactTable,
   getCoreRowModel,
   getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   flexRender,
   ColumnDef,
   SortingState,
 } from '@tanstack/react-table';
+import BatchSklDownloader from '@/components/BatchSklDownloader';
+import IndividualSklDownloader from '@/components/IndividualSklDownloader';
 
 interface Student {
   id: string;
@@ -239,15 +240,7 @@ export default function GraduationPage() {
               
               {student.isGraduated && (
                 <>
-                  <a
-                    href={`/dashboard/students/graduation/print-skl/${student.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    title="Cetak SKL"
-                    className="p-1.5 text-slate-450 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </a>
+                  <IndividualSklDownloader studentId={student.id} />
                   <a
                     href={`/dashboard/students/graduation/print-ijazah/${student.id}`}
                     target="_blank"
@@ -275,7 +268,6 @@ export default function GraduationPage() {
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
 
@@ -315,6 +307,21 @@ export default function GraduationPage() {
     });
   };
 
+  const handleBatchCancel = () => {
+    const studentIds = students.filter(s => s.isGraduated).map(s => s.id);
+    if (studentIds.length === 0) {
+      showToast('Tidak ada siswa yang berstatus lulus.', 'info');
+      return;
+    }
+    if (!window.confirm('Apakah Anda yakin ingin membatalkan status kelulusan SEMUA siswa?')) return;
+    
+    batchMutation.mutate({
+      studentIds,
+      isGraduated: false,
+      graduationDate: null,
+    });
+  };
+
   const handleAssignSkl = () => {
     if (!sklFormat.trim()) {
       showToast('Masukkan format nomor SKL terlebih dahulu.', 'error');
@@ -343,16 +350,17 @@ export default function GraduationPage() {
                 Assign Nomor SKL
               </button>
 
-              {/* Batch Print SKL */}
-              <a
-                href="/dashboard/students/graduation/print-skl/batch"
-                target="_blank"
-                rel="noreferrer"
-                className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-teal-600/10"
+              {/* Batch Print SKL (Direct Download) */}
+              <BatchSklDownloader />
+
+              {/* Batch Cancel Graduation */}
+              <button
+                onClick={handleBatchCancel}
+                className="px-4 py-2.5 bg-rose-600/10 hover:bg-rose-600/20 active:bg-rose-600/30 text-rose-500 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all border border-rose-500/20"
               >
-                <ClipboardList className="w-4 h-4" />
-                Cetak Massal SKL
-              </a>
+                <XCircle className="w-4 h-4" />
+                Batalkan Semua
+              </button>
 
               {/* Batch Graduate */}
               <button

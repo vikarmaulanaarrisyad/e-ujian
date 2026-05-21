@@ -37,7 +37,7 @@ export const getSchoolProfile = async (req: Request, res: Response, next: NextFu
 
 export const updateSchoolProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, npsn, address, headmaster, headmasterNip, city, sklNumberFormat } = req.body;
+    const { name, npsn, nsm, address, district, province, headmaster, headmasterNip, city, sklNumberFormat } = req.body;
     let profile = await prisma.schoolProfile.findFirst();
 
     let logoUrl = profile?.logoUrl;
@@ -53,7 +53,10 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
         data: {
           name: name || profile.name,
           npsn: npsn || profile.npsn,
+          nsm: nsm !== undefined ? (nsm || null) : profile.nsm,
           address: address || profile.address,
+          district: district || profile.district,
+          province: province || profile.province,
           city: city || profile.city,
           headmaster: headmaster || profile.headmaster,
           headmasterNip: headmasterNip || profile.headmasterNip,
@@ -66,7 +69,10 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
         data: {
           name: name || DEFAULT_SCHOOL.name,
           npsn: npsn || DEFAULT_SCHOOL.npsn,
+          nsm: nsm || null,
           address: address || DEFAULT_SCHOOL.address,
+          district: district || null,
+          province: province || null,
           city: city || DEFAULT_SCHOOL.city,
           headmaster: headmaster || DEFAULT_SCHOOL.headmaster,
           headmasterNip: headmasterNip || DEFAULT_SCHOOL.headmasterNip,

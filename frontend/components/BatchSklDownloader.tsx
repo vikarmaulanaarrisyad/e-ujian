@@ -1,0 +1,243 @@
+import React, { useState, useRef } from 'react';
+import api from '@/lib/api';
+import { Loader2, Download, ClipboardList } from 'lucide-react';
+import { toJpeg } from 'html-to-image';
+import jsPDF from 'jspdf';
+
+interface BatchSklDownloaderProps {
+  className?: string;
+}
+
+export default function BatchSklDownloader({ className }: BatchSklDownloaderProps) {
+  const [downloading, setDownloading] = useState(false);
+  const [batchData, setBatchData] = useState<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleDownload = async () => {
+    try {
+      setDownloading(true);
+      
+      // 1. Fetch data
+      const res = await api.get('/documents/skl-batch');
+      const data = res.data;
+      setBatchData(data);
+      
+      // Give React a moment to render the hidden DOM elements
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (!containerRef.current) {
+        throw new Error("Container not found");
+      }
+
+      // 2. Generate PDF
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const pages = containerRef.current.querySelectorAll('.skl-page');
+      
+      if (pages.length === 0) {
+        alert("Tidak ada data siswa lulus untuk di-download.");
+        setDownloading(false);
+        setBatchData(null);
+        return;
+      }
+      
+      for (let i = 0; i < pages.length; i++) {
+        const element = pages[i] as HTMLElement;
+        
+        // Use toJpeg instead of toPng to reduce file size massively
+        const imgData = await toJpeg(element, {
+          cacheBust: true,
+          backgroundColor: '#ffffff',
+          pixelRatio: 2, // High resolution
+          quality: 0.85,  // Good quality JPEG compression
+          style: {
+            margin: '0',
+            transform: 'none',
+          }
+        });
+        
+        if (i > 0) {
+          pdf.addPage();
+        }
+        
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      }
+      
+      const fileName = `SKL_Massal_${data.schoolProfile.name.replace(/\s+/g, '_')}_${new Date().getFullYear()}.pdf`;
+      pdf.save(fileName);
+      
+    } catch (err) {
+      console.error('Error generating batch PDF:', err);
+      alert('Terjadi kesalahan saat mengunduh PDF massal.');
+    } finally {
+      setDownloading(false);
+      setBatchData(null); // Clear data to unmount hidden DOM
+    }
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('id-ID', {
+      day: 'numeric', month: 'long', year: 'numeric',
+    });
+  };
+
+  return (
+    <>
+      <button
+        onClick={handleDownload}
+        disabled={downloading}
+        className={className || "px-4 py-2.5 bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-teal-600/10 disabled:opacity-70 disabled:cursor-not-allowed"}
+      >
+        {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardList className="w-4 h-4" />}
+        {downloading ? 'Memproses PDF...' : 'Download Massal SKL'}
+      </button>
+
+      {/* Hidden container for rendering SKL pages */}
+      {batchData && (
+        <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', opacity: 0, zIndex: -9999, pointerEvents: 'none' }}>
+          <div ref={containerRef}>
+            <style dangerouslySetInnerHTML={{ __html: `
+              .skl-page {
+                background: white;
+                width: 210mm;
+                min-height: 297mm;
+                color: #000;
+                font-family: "Times New Roman", Times, serif;
+                position: relative;
+              }
+              .page-inner { padding: 2cm; min-height: 297mm; display: flex; flex-direction: column; }
+              .kop-surat-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; font-family: "Times New Roman", Times, serif; }
+              .kop-surat-table td { vertical-align: middle; padding: 0; }
+              .kop-logo-td { width: 105px; text-align: left; }
+              .kop-logo-td img { width: 95px; height: 95px; object-fit: contain; }
+              .kop-logo-placeholder { width: 95px; height: 95px; border: 1.5px dashed #999; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #999; letter-spacing: 1px; text-align: center; line-height: 1.4; }
+              .kop-text-td { text-align: center; }
+              .kop-text-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+              .kop-right-spacer { width: 105px; }
+              .kop-line-yayasan { font-size: 16px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; line-height: 1.3; }
+              .kop-line-sekolah { font-size: 20px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; line-height: 1.2; margin: 2px 0 2px; }
+              .kop-line-akreditasi { font-size: 14px; font-weight: bold; letter-spacing: 0.3px; text-transform: uppercase; }
+              .kop-line-alamat { font-size: 13px; font-weight: normal; font-style: italic; line-height: 1.4; width: 100%; }
+              .kop-divider { margin-top: 2px; }
+              .kop-divider-thick { height: 3px; background: #000; margin-bottom: 2px; }
+              .kop-divider-thin  { height: 1px; background: #000; }
+              .skl-judul-wrap { text-align: center; margin-top: 26px; margin-bottom: 20px; }
+              .skl-judul { display: block; font-size: 18px; font-weight: bold; text-transform: uppercase; text-decoration: underline; letter-spacing: 1.5px; margin-bottom: 5px; }
+              .skl-nomor { font-size: 14px; }
+              .skl-body { flex: 1; font-size: 15px; line-height: 1.6; }
+              .skl-para { text-align: justify; margin-bottom: 12px; }
+              .identity-table { margin: 4px 0 16px 24px; border-collapse: collapse; width: calc(100% - 24px); }
+              .identity-table td { padding: 4px 0; vertical-align: top; font-size: 15px; line-height: 1.6; }
+              .identity-table .col-label { width: 220px; }
+              .identity-table .col-sep { width: 16px; }
+              .lulus-stamp-wrap { text-align: center; margin: 16px 0 14px; }
+              .lulus-stamp { display: inline-block; font-size: 28px; font-weight: 900; letter-spacing: 8px; border: 3px solid #000; padding: 10px 50px; border-radius: 6px; }
+              .ttd-wrap { margin-top: auto; padding-top: 20px; display: flex; justify-content: flex-end; }
+              .ttd-block { text-align: center; width: 250px; font-size: 15px; line-height: 1.6; }
+              .ttd-space { height: 80px; }
+              .ttd-name { font-weight: bold; text-decoration: underline; text-transform: uppercase; letter-spacing: 0.5px; }
+            `}} />
+            
+            {batchData.students.map((student: any) => {
+              const sklNumber = student.sklNumber || `........./MI.BH/${new Date().getFullYear()}`;
+
+              return (
+                <div key={student.id} className="skl-page">
+                  <div className="page-inner">
+                    <table className="kop-surat-table">
+                      <tbody>
+                        <tr>
+                          <td className="kop-logo-td">
+                            {batchData.schoolProfile.logoUrl
+                              ? <img src={batchData.schoolProfile.logoUrl} alt="Logo" crossOrigin="anonymous" />
+                              : <div className="kop-logo-placeholder">LOGO<br/>MADRASAH</div>
+                            }
+                          </td>
+                          <td className="kop-text-td">
+                            <div className="kop-text-inner">
+                              <span className="kop-line-yayasan">YAYASAN BUSTANUL HUDA DAWUHAN</span>
+                              <span className="kop-line-sekolah">{batchData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}</span>
+                              <span className="kop-line-akreditasi">
+                                TERAKREDITASI A NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}
+                              </span>
+                              <span className="kop-line-alamat">Alamat : {batchData.schoolProfile.address}</span>
+                            </div>
+                          </td>
+                          <td className="kop-right-spacer"></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div className="kop-divider">
+                      <div className="kop-divider-thick" />
+                      <div className="kop-divider-thin" />
+                    </div>
+                    <div className="skl-judul-wrap">
+                      <span className="skl-judul">SURAT KETERANGAN LULUS</span>
+                      <span className="skl-nomor">Nomor: {sklNumber}</span>
+                    </div>
+                    <div className="skl-body">
+                      <p className="skl-para">
+                        Yang bertanda tangan di bawah ini, Kepala {batchData.schoolProfile.name || 'Madrasah Ibtidaiyah Bustanul Huda 01 Dawuhan'},
+                        Kecamatan {batchData.schoolProfile.district || 'Tamanan'}, Kabupaten {batchData.schoolProfile.city || 'Bondowoso'}, Provinsi {batchData.schoolProfile.province || 'Jawa Timur'}, menerangkan
+                        dengan sesungguhnya bahwa peserta didik yang tersebut di bawah ini:
+                      </p>
+                      <table className="identity-table">
+                        <tbody>
+                          {([
+                            ['Nama Lengkap',              <strong key="n" style={{ textTransform: 'uppercase' }}>{student.name}</strong>],
+                            ['Tempat, Tanggal Lahir',     `${student.placeOfBirth || '-'}, ${formatDate(student.dateOfBirth)}`],
+                            ['Nama Orang Tua / Wali',     student.parentName || '-'],
+                            ['Nomor Induk Siswa (NIS)',   student.nis],
+                            ['Nomor Induk Siswa Nasional (NISN)', student.nisn],
+                          ] as [string, React.ReactNode][]).map(([label, value], i) => (
+                            <tr key={i}>
+                              <td className="col-label">{label}</td>
+                              <td className="col-sep">:</td>
+                              <td>{value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <p className="skl-para">
+                        telah mengikuti seluruh program pembelajaran dan berdasarkan hasil rapat
+                        Dewan Guru {batchData.schoolProfile.name || 'Madrasah Ibtidaiyah Bustanul Huda 01'} tentang
+                        Penetapan Kelulusan Peserta Didik Tahun Pelajaran {batchData.academicYear}, serta
+                        memperhatikan pencapaian kompetensi peserta didik pada Kurikulum yang berlaku,
+                        maka yang bersangkutan dinyatakan:
+                      </p>
+                      <div className="lulus-stamp-wrap">
+                        <span className="lulus-stamp">L U L U S</span>
+                      </div>
+                      <p className="skl-para">
+                        Surat Keterangan Lulus ini bersifat sementara dan dinyatakan berlaku sampai
+                        dengan diterbitkannya Ijazah asli. Demikian Surat Keterangan Lulus ini dibuat
+                        dengan sebenar-benarnya untuk dapat dipergunakan sebagaimana mestinya.
+                      </p>
+                    </div>
+                    <div className="ttd-wrap">
+                      <div className="ttd-block">
+                        <p>{batchData.schoolProfile.city || 'Bondowoso'}, {formatDate(student.graduationDate)}</p>
+                        <p>Kepala Madrasah,</p>
+                        <div className="ttd-space" />
+                        <p className="ttd-name">{batchData.schoolProfile.headmaster}</p>
+                        <p>NIP. {batchData.schoolProfile.headmasterNip || '–'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
