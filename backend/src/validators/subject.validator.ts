@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SubjectGroup } from '@prisma/client';
+import { SubjectGroup } from '../types/enums';
 
 export const createSubjectSchema = z.object({
   name: z.string().min(2, 'Nama mata pelajaran minimal 2 karakter'),

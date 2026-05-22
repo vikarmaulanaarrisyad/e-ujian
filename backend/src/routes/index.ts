@@ -10,6 +10,8 @@ import academicYearRouter from './academicYear.routes';
 import userRouter from './user.routes';
 import dashboardRouter from './dashboard.routes';
 import activityLogRouter from './activityLog.routes';
+import tenantRouter from './tenant.routes';
+import syncRouter from './sync.routes';
 
 const router = Router();
 
@@ -24,6 +26,8 @@ router.use('/academic-years', academicYearRouter);
 router.use('/users', userRouter);
 router.use('/dashboard', dashboardRouter);
 router.use('/activity-logs', activityLogRouter);
+router.use('/tenants', tenantRouter);
+router.use('/sync', syncRouter);
 
 export default router;
 

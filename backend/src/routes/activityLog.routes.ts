@@ -6,7 +6,7 @@ import {
 } from '../controllers/activityLog.controller';
 import { authenticateJWT } from '../middlewares/auth.middleware';
 import { requireRoles } from '../middlewares/rbac.middleware';
-import { Role } from '@prisma/client';
+import { Role } from '../types/enums';
 
 const router = Router();
 

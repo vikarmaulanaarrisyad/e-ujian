@@ -31,6 +31,8 @@ interface BatchSklData {
     city: string | null;
     logoUrl: string | null;
     sklNumberFormat: string | null;
+    nsm?: string | null;
+    tenant?: { name: string };
   };
   academicYear: string;
 }
@@ -417,10 +419,10 @@ export default function PrintSKLBatchPage() {
                   </div>
 
                   <div className="kop-text">
-                    <span className="kop-line-yayasan">YAYASAN BUSTANUL HUDA DAWUHAN</span>
+                    <span className="kop-line-yayasan">{schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN"}</span>
                     <span className="kop-line-sekolah">{schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01'}</span>
                     <span className="kop-line-akreditasi">
-                      Terakreditasi &ldquo;A&rdquo;&ensp;|&ensp;NPSN: {schoolProfile.npsn || '60713609'}&ensp;|&ensp;NSM: 111233280040
+                      Terakreditasi &ldquo;A&rdquo;&ensp;|&ensp;NPSN: {schoolProfile.npsn || '60713609'}&ensp;|&ensp;NSM: {schoolProfile?.nsm || "-"}
                     </span>
                     <span className="kop-line-alamat">{schoolProfile.address}</span>
                   </div>

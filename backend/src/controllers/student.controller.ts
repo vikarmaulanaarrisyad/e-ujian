@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import ExcelJS from 'exceljs';
 import prisma from '../db';
 import { createStudentSchema, updateStudentSchema } from '../validators/student.validator';
-import { Gender } from '@prisma/client';
+import { Gender } from '../types/enums';
 import fs from 'fs';
 import path from 'path';
 import AdmZip from 'adm-zip';
@@ -11,6 +11,7 @@ import { logActivity } from '../lib/activityLog';
 // Get all students
 export const getAllStudents = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     const { name, nis, class: className } = req.query;
 
     const filter: any = {};
@@ -27,6 +28,7 @@ export const getAllStudents = async (req: Request, res: Response, next: NextFunc
     // Alumni filter
     const isAlumniParam = req.query.alumni === 'true';
     filter.isAlumni = isAlumniParam;
+    filter.tenantId = tenantId;
 
     const students = await prisma.student.findMany({
       where: filter,
@@ -42,9 +44,10 @@ export const getAllStudents = async (req: Request, res: Response, next: NextFunc
 // Get single student
 export const getStudentById = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     const { id } = req.params;
     const student = await prisma.student.findUnique({
-      where: { id },
+      where: { id, tenantId },
     });
 
     if (!student) {
@@ -60,6 +63,7 @@ export const getStudentById = async (req: Request, res: Response, next: NextFunc
 // Create student
 export const createStudent = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     const validation = createStudentSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({
@@ -70,18 +74,18 @@ export const createStudent = async (req: Request, res: Response, next: NextFunct
 
     const { nis, nisn } = validation.data;
 
-    const existingNis = await prisma.student.findUnique({ where: { nis } });
+    const existingNis = await prisma.student.findFirst({ where: { nis, tenantId } });
     if (existingNis) {
       return res.status(400).json({ message: 'NIS already registered' });
     }
 
-    const existingNisn = await prisma.student.findUnique({ where: { nisn } });
+    const existingNisn = await prisma.student.findFirst({ where: { nisn, tenantId } });
     if (existingNisn) {
       return res.status(400).json({ message: 'NISN already registered' });
     }
 
-    const student = await prisma.student.create({
-      data: validation.data,
+    const student = await (prisma.student.create as any)({
+      data: { ...validation.data, tenantId },
     });
 
     logActivity({ req, action: 'CREATE_STUDENT', entity: 'Student', entityId: student.id, description: `Menambahkan siswa baru: ${student.name} (NIS: ${student.nis})` });
@@ -98,6 +102,7 @@ export const createStudent = async (req: Request, res: Response, next: NextFunct
 // Update student
 export const updateStudent = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     const { id } = req.params;
     const validation = updateStudentSchema.safeParse(req.body);
     if (!validation.success) {
@@ -115,22 +120,22 @@ export const updateStudent = async (req: Request, res: Response, next: NextFunct
     const { nis, nisn } = validation.data;
 
     if (nis && nis !== student.nis) {
-      const existingNis = await prisma.student.findUnique({ where: { nis } });
+      const existingNis = await prisma.student.findFirst({ where: { nis, tenantId } });
       if (existingNis) {
         return res.status(400).json({ message: 'NIS already registered' });
       }
     }
 
     if (nisn && nisn !== student.nisn) {
-      const existingNisn = await prisma.student.findUnique({ where: { nisn } });
+      const existingNisn = await prisma.student.findFirst({ where: { nisn, tenantId } });
       if (existingNisn) {
         return res.status(400).json({ message: 'NISN already registered' });
       }
     }
 
-    const updatedStudent = await prisma.student.update({
-      where: { id },
-      data: validation.data,
+    const updatedStudent = await (prisma.student.update as any)({
+      where: { id, tenantId },
+      data: { ...validation.data, tenantId },
     });
 
     logActivity({ req, action: 'UPDATE_STUDENT', entity: 'Student', entityId: id, description: `Memperbarui data siswa: ${student.name} (NIS: ${student.nis})` });
@@ -147,6 +152,7 @@ export const updateStudent = async (req: Request, res: Response, next: NextFunct
 // Delete student
 export const deleteStudent = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     const { id } = req.params;
     const student = await prisma.student.findUnique({ where: { id } });
     if (!student) {
@@ -154,7 +160,7 @@ export const deleteStudent = async (req: Request, res: Response, next: NextFunct
     }
 
     await prisma.student.delete({
-      where: { id },
+      where: { id, tenantId },
     });
 
     logActivity({ req, action: 'DELETE_STUDENT', entity: 'Student', entityId: id, description: `Menghapus data siswa: ${student.name} (NIS: ${student.nis})` });
@@ -168,6 +174,7 @@ export const deleteStudent = async (req: Request, res: Response, next: NextFunct
 // Get empty Excel template
 export const getStudentTemplate = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Template Siswa');
 
@@ -222,7 +229,9 @@ export const getStudentTemplate = async (req: Request, res: Response, next: Next
 // Export students to Excel
 export const exportStudents = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     const students = await prisma.student.findMany({
+      where: { tenantId },
       orderBy: { name: 'asc' },
     });
 
@@ -345,6 +354,7 @@ const parseFlexibleDate = (val: any): Date | null => {
 // Import students from Excel
 export const importStudents = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     if (!req.file) {
       return res.status(400).json({ message: 'No Excel file uploaded' });
     }
@@ -416,17 +426,17 @@ export const importStudents = async (req: Request, res: Response, next: NextFunc
 
     await prisma.$transaction(async (tx) => {
       for (const student of studentsToInsert) {
-        const existingNis = await tx.student.findUnique({ where: { nis: student.nis } });
+        const existingNis = await tx.student.findFirst({ where: { nis: student.nis, tenantId } });
         if (existingNis) {
           throw new Error(`NIS '${student.nis}' is already registered in the system.`);
         }
 
-        const existingNisn = await tx.student.findUnique({ where: { nisn: student.nisn } });
+        const existingNisn = await tx.student.findFirst({ where: { nisn: student.nisn, tenantId } });
         if (existingNisn) {
           throw new Error(`NISN '${student.nisn}' is already registered in the system.`);
         }
 
-        await tx.student.create({ data: student });
+        await (tx.student.create as any)({ data: { ...student, tenantId } });
         successCount++;
       }
     }).catch((err) => {
@@ -455,6 +465,7 @@ export const importStudents = async (req: Request, res: Response, next: NextFunc
 // Update graduation status
 export const updateGraduationStatus = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     const { id } = req.params;
     const { isGraduated, graduationDate, certificateNumber } = req.body;
 
@@ -464,14 +475,14 @@ export const updateGraduationStatus = async (req: Request, res: Response, next: 
     }
 
     if (certificateNumber && certificateNumber !== student.certificateNumber) {
-      const existing = await prisma.student.findUnique({ where: { certificateNumber } });
+      const existing = await prisma.student.findFirst({ where: { certificateNumber, tenantId } });
       if (existing) {
         return res.status(400).json({ message: 'Nomor seri ijazah sudah digunakan oleh siswa lain.' });
       }
     }
 
-    const updated = await prisma.student.update({
-      where: { id },
+    const updated = await (prisma.student.update as any)({
+      where: { id, tenantId },
       data: {
         isGraduated,
         graduationDate: graduationDate ? new Date(graduationDate) : null,
@@ -490,14 +501,15 @@ export const updateGraduationStatus = async (req: Request, res: Response, next: 
 // Batch update graduation status
 export const batchUpdateGraduation = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     const { studentIds, isGraduated, graduationDate } = req.body;
 
     if (!Array.isArray(studentIds) || studentIds.length === 0) {
       return res.status(400).json({ message: 'Daftar ID siswa tidak valid.' });
     }
 
-    await prisma.student.updateMany({
-      where: { id: { in: studentIds } },
+    await (prisma.student.updateMany as any)({
+      where: { id: { in: studentIds }, tenantId },
       data: {
         isGraduated,
         graduationDate: graduationDate ? new Date(graduationDate) : null,
@@ -515,17 +527,18 @@ export const batchUpdateGraduation = async (req: Request, res: Response, next: N
 // Batch assign SKL numbers to all graduated students
 export const batchAssignSklNumbers = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     const { format, overwrite } = req.body;
     // format: e.g. "B.{seq}/MI.BH/{year}" — if not provided, use school profile format
     // overwrite: boolean — if true, reassign even if student already has a sklNumber
 
     // Get school profile for default format
-    const profile = await prisma.schoolProfile.findFirst();
+    const profile = await prisma.schoolProfile.findUnique({ where: { tenantId } });
     const numberFormat = format || profile?.sklNumberFormat || 'B.{seq}/MI.BH/{year}';
 
     // Fetch all graduated students ordered by name
     const students = await prisma.student.findMany({
-      where: { isGraduated: true },
+      where: { isGraduated: true, tenantId },
       orderBy: { name: 'asc' },
     });
 
@@ -567,7 +580,7 @@ export const batchAssignSklNumbers = async (req: Request, res: Response, next: N
     // Apply in transaction
     await prisma.$transaction(
       updates.map(u =>
-        prisma.student.update({
+        (prisma.student.update as any)({
           where: { id: u.id },
           data: { sklNumber: u.sklNumber },
         })
@@ -590,6 +603,7 @@ export const batchAssignSklNumbers = async (req: Request, res: Response, next: N
 // Upload photos via ZIP
 export const uploadPhotos = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     if (!req.file) {
       return res.status(400).json({ message: 'Tidak ada file ZIP yang diunggah.' });
     }
@@ -633,7 +647,7 @@ export const uploadPhotos = async (req: Request, res: Response, next: NextFuncti
       if (!nisn) continue;
 
       // Check if student with this NISN exists
-      const student = await prisma.student.findUnique({ where: { nisn } });
+      const student = await prisma.student.findFirst({ where: { nisn, tenantId } });
       if (!student) {
         errors.push(`NISN ${nisn} tidak ditemukan di database (${fileName}).`);
         continue;
@@ -649,7 +663,7 @@ export const uploadPhotos = async (req: Request, res: Response, next: NextFuncti
 
       // Update student photoUrl in DB
       const photoUrl = `/uploads/photos/${newFileName}`;
-      await prisma.student.update({
+      await (prisma.student.update as any)({
         where: { id: student.id },
         data: { photoUrl },
       });
@@ -676,11 +690,13 @@ export const uploadPhotos = async (req: Request, res: Response, next: NextFuncti
 // Archive graduated students to Alumni
 export const archiveStudents = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     // Cari siswa yang sudah lulus tapi belum jadi alumni
     const graduatedStudents = await prisma.student.findMany({
       where: {
         isGraduated: true,
         isAlumni: false,
+        tenantId,
       },
     });
 
@@ -689,17 +705,16 @@ export const archiveStudents = async (req: Request, res: Response, next: NextFun
     }
 
     // Dapatkan tahun ajaran aktif untuk label alumni
-    const activeYearRecord = await prisma.academicYear.findFirst({
-      where: { isActive: true },
-    });
+    const activeYearRecord = await prisma.academicYear.findFirst({ where: { isActive: true, tenantId } });
     
     const alumniYearStr = activeYearRecord ? activeYearRecord.year : new Date().getFullYear().toString();
 
     // Lakukan pemindahan secara massal
-    const result = await prisma.student.updateMany({
+    const result = await (prisma.student.updateMany as any)({
       where: {
         isGraduated: true,
         isAlumni: false,
+        tenantId,
       },
       data: {
         isAlumni: true,

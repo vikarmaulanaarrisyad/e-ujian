@@ -17,7 +17,7 @@ export const getSchoolProfile = async (req: Request, res: Response, next: NextFu
 
     if (!profile) {
       // If none exists, create default one
-      profile = await prisma.schoolProfile.create({
+      profile = await (prisma.schoolProfile.create as any)({
         data: DEFAULT_SCHOOL,
       });
     }
@@ -49,7 +49,7 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
     }
 
     if (profile) {
-      profile = await prisma.schoolProfile.update({
+      profile = await (prisma.schoolProfile.update as any)({
         where: { id: profile.id },
         data: {
           name: name || profile.name,
@@ -66,7 +66,7 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
         },
       });
     } else {
-      profile = await prisma.schoolProfile.create({
+      profile = await (prisma.schoolProfile.create as any)({
         data: {
           name: name || DEFAULT_SCHOOL.name,
           npsn: npsn || DEFAULT_SCHOOL.npsn,

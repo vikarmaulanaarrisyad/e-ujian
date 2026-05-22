@@ -12,6 +12,7 @@ interface UserData {
   name: string;
   role: 'ADMIN' | 'GURU' | 'STAFF';
   createdAt: string;
+  tenant?: { name: string };
 }
 
 export default function UsersPage() {
@@ -187,6 +188,13 @@ export default function UsersPage() {
                     </td>
                     <td className="py-4 px-6 font-mono text-slate-400">
                       {u.username}
+                      {u.tenant?.name && (
+                        <div className="text-[10px] text-slate-500 mt-1.5 font-sans">
+                          <span className="bg-slate-800/60 px-2 py-0.5 rounded text-slate-300">
+                            🏢 {u.tenant.name}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="py-4 px-6">
                       <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold ${

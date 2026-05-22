@@ -8,7 +8,9 @@ interface User {
   id: string;
   username: string;
   name: string;
-  role: 'ADMIN' | 'GURU' | 'STAFF';
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'GURU' | 'STAFF';
+  tenantId: string;
+  tenantName?: string;
 }
 
 interface AuthContextType {
@@ -16,6 +18,7 @@ interface AuthContextType {
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
+  switchTenant: (tenantId: string) => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -83,8 +86,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     router.push('/login');
   };
 
+  const switchTenant = async (tenantId: string) => {
+    try {
+      const response = await api.post('/auth/switch-tenant', { tenantId });
+      const { token, user: userData } = response.data;
+      localStorage.setItem('token', token);
+      setUser(userData);
+      // Reload page to reset all states
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to switch tenant', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, switchTenant, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

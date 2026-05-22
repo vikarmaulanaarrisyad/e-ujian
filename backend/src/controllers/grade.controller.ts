@@ -6,9 +6,9 @@ import { updateGradeWeightSchema, saveReportGradesSchema, saveExamGradesSchema }
 import fs from 'fs';
 
 // Helper to get active academic year
-const getActiveYear = async () => {
+const getActiveYear = async (tenantId: string) => {
   return await prisma.academicYear.findFirst({
-    where: { isActive: true },
+    where: { tenantId, isActive: true },
     include: { gradeWeights: true },
   });
 };
@@ -42,7 +42,10 @@ const getCellValueAsString = (cell: ExcelJS.Cell): string => {
 
 export const getGradeWeight = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const activeYear = await getActiveYear();
+    const tenantId = (req as any).user.tenantId;
+   
+     
+    const activeYear = await getActiveYear(tenantId);
     if (!activeYear) {
       return res.status(404).json({ message: 'No active academic year found' });
     }
@@ -50,8 +53,9 @@ export const getGradeWeight = async (req: Request, res: Response, next: NextFunc
     let weight = activeYear.gradeWeights[0];
     if (!weight) {
       // Create a default if not exists
-      weight = await prisma.gradeWeight.create({
+      weight = await (prisma.gradeWeight.create as any)({
         data: {
+          tenantId,
           reportPercentage: 60.0,
           examPercentage: 40.0,
           academicYearId: activeYear.id,
@@ -59,7 +63,7 @@ export const getGradeWeight = async (req: Request, res: Response, next: NextFunc
       });
     }
 
-    const profile: any = await prisma.schoolProfile.findFirst();
+    const profile: any = await prisma.schoolProfile.findUnique({ where: { tenantId } });
 
     return res.status(200).json({
       academicYear: {
@@ -77,6 +81,8 @@ export const getGradeWeight = async (req: Request, res: Response, next: NextFunc
 
 export const updateGradeWeight = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
+    
     const validation = updateGradeWeightSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({
@@ -85,9 +91,14 @@ export const updateGradeWeight = async (req: Request, res: Response, next: NextF
       });
     }
 
-    const activeYear = await getActiveYear();
+    
+    const activeYear = await getActiveYear(tenantId);
     if (!activeYear) {
-      return res.status(404).json({ message: 'No active academic year found' });
+      return res.status(200).json({
+        subject: null,
+        academicYearId: null,
+        students: [],
+      });
     }
 
     const { reportPercentage, examPercentage, activeSemesters } = validation.data;
@@ -95,13 +106,14 @@ export const updateGradeWeight = async (req: Request, res: Response, next: NextF
 
     let weight = activeYear.gradeWeights[0];
     if (weight) {
-      weight = await prisma.gradeWeight.update({
+      weight = await (prisma.gradeWeight.update as any)({
         where: { id: weight.id },
         data: { reportPercentage, examPercentage, activeSemesters: activeSemestersString },
       });
     } else {
-      weight = await prisma.gradeWeight.create({
+      weight = await (prisma.gradeWeight.create as any)({
         data: {
+          tenantId,
           reportPercentage,
           examPercentage,
           activeSemesters: activeSemestersString,
@@ -125,12 +137,15 @@ export const updateGradeWeight = async (req: Request, res: Response, next: NextF
 
 export const getReportGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
+    
     const { subjectId } = req.query;
     if (!subjectId) {
       return res.status(400).json({ message: 'Subject ID is required' });
     }
 
-    const activeYear = await getActiveYear();
+    
+    const activeYear = await getActiveYear(tenantId);
     if (!activeYear) {
       return res.status(404).json({ message: 'No active academic year found' });
     }
@@ -144,6 +159,7 @@ export const getReportGrades = async (req: Request, res: Response, next: NextFun
     }
 
     const students = await prisma.student.findMany({
+      where: { tenantId },
       orderBy: { name: 'asc' },
       include: {
         reportGrades: {
@@ -182,6 +198,8 @@ export const getReportGrades = async (req: Request, res: Response, next: NextFun
 
 export const saveReportGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
+    
     const validation = saveReportGradesSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({
@@ -190,7 +208,8 @@ export const saveReportGrades = async (req: Request, res: Response, next: NextFu
       });
     }
 
-    const activeYear = await getActiveYear();
+    
+    const activeYear = await getActiveYear(tenantId);
     if (!activeYear) {
       return res.status(404).json({ message: 'No active academic year found' });
     }
@@ -199,9 +218,10 @@ export const saveReportGrades = async (req: Request, res: Response, next: NextFu
 
     await prisma.$transaction(
       grades.map((g) =>
-        prisma.reportGrade.upsert({
+        (prisma.reportGrade.upsert as any)({
           where: {
-            studentId_subjectId_academicYearId_semester: {
+            tenantId_studentId_subjectId_academicYearId_semester: {
+              tenantId,
               studentId: g.studentId,
               subjectId: g.subjectId,
               academicYearId: activeYear.id,
@@ -210,6 +230,7 @@ export const saveReportGrades = async (req: Request, res: Response, next: NextFu
           },
           update: { score: g.score },
           create: {
+            tenantId,
             studentId: g.studentId,
             subjectId: g.subjectId,
             academicYearId: activeYear.id,
@@ -231,12 +252,15 @@ export const saveReportGrades = async (req: Request, res: Response, next: NextFu
 // Export Report template or existing grades for a Subject
 export const exportReportGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
+    
     const { subjectId, semester } = req.query;
     if (!subjectId) {
       return res.status(400).json({ message: 'Subject ID is required' });
     }
 
-    const activeYear = await getActiveYear();
+    
+    const activeYear = await getActiveYear(tenantId);
     if (!activeYear) {
       return res.status(404).json({ message: 'No active academic year found' });
     }
@@ -249,6 +273,7 @@ export const exportReportGrades = async (req: Request, res: Response, next: Next
     const targetSemester = semester ? parseInt(String(semester)) : null;
 
     const students = await prisma.student.findMany({
+      where: { tenantId },
       orderBy: { name: 'asc' },
       include: {
         reportGrades: {
@@ -384,6 +409,8 @@ export const exportReportGrades = async (req: Request, res: Response, next: Next
 // Import Report Grades for a Subject
 export const importReportGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
+    
     const { subjectId } = req.body;
     if (!subjectId) {
       if (req.file) fs.unlinkSync(req.file.path);
@@ -394,7 +421,8 @@ export const importReportGrades = async (req: Request, res: Response, next: Next
       return res.status(400).json({ message: 'No Excel file uploaded' });
     }
 
-    const activeYear = await getActiveYear();
+    
+    const activeYear = await getActiveYear(tenantId);
     if (!activeYear) {
       fs.unlinkSync(req.file.path);
       return res.status(404).json({ message: 'No active academic year found' });
@@ -477,14 +505,15 @@ export const importReportGrades = async (req: Request, res: Response, next: Next
 
     await prisma.$transaction(async (tx) => {
       for (const item of gradesToUpsert) {
-        const student = await tx.student.findUnique({ where: { nis: item.nis } });
+        const student = await tx.student.findFirst({ where: { nis: item.nis, tenantId } });
         if (!student) {
           throw new Error(`Student with NIS '${item.nis}' not found in the database.`);
         }
 
-        await tx.reportGrade.upsert({
+        await (tx.reportGrade.upsert as any)({
           where: {
-            studentId_subjectId_academicYearId_semester: {
+            tenantId_studentId_subjectId_academicYearId_semester: {
+              tenantId,
               studentId: student.id,
               subjectId: subject.id,
               academicYearId: activeYear.id,
@@ -493,6 +522,7 @@ export const importReportGrades = async (req: Request, res: Response, next: Next
           },
           update: { score: item.score },
           create: {
+            tenantId,
             studentId: student.id,
             subjectId: subject.id,
             academicYearId: activeYear.id,
@@ -502,7 +532,7 @@ export const importReportGrades = async (req: Request, res: Response, next: Next
         });
         savedCount++;
       }
-    }).catch((err) => {
+    }, { maxWait: 100000, timeout: 100000 }).catch((err) => {
       dbErrors.push(err.message);
     });
 
@@ -529,14 +559,20 @@ export const importReportGrades = async (req: Request, res: Response, next: Next
 
 export const getExamGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
+    
     const { subjectId } = req.query;
     if (!subjectId) {
       return res.status(400).json({ message: 'Subject ID is required' });
     }
 
-    const activeYear = await getActiveYear();
+    const activeYear = await getActiveYear((req as any).user.tenantId);
     if (!activeYear) {
-      return res.status(404).json({ message: 'No active academic year found' });
+      return res.status(200).json({
+        subject: null,
+        academicYearId: null,
+        students: [],
+      });
     }
 
     const subject = await prisma.subject.findUnique({
@@ -547,6 +583,7 @@ export const getExamGrades = async (req: Request, res: Response, next: NextFunct
     }
 
     const students = await prisma.student.findMany({
+      where: { tenantId },
       orderBy: { name: 'asc' },
       include: {
         examGrades: {
@@ -582,6 +619,8 @@ export const getExamGrades = async (req: Request, res: Response, next: NextFunct
 
 export const saveExamGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
+    
     const validation = saveExamGradesSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({
@@ -590,7 +629,8 @@ export const saveExamGrades = async (req: Request, res: Response, next: NextFunc
       });
     }
 
-    const activeYear = await getActiveYear();
+    
+    const activeYear = await getActiveYear(tenantId);
     if (!activeYear) {
       return res.status(404).json({ message: 'No active academic year found' });
     }
@@ -599,9 +639,10 @@ export const saveExamGrades = async (req: Request, res: Response, next: NextFunc
 
     await prisma.$transaction(
       grades.map((g) =>
-        prisma.examGrade.upsert({
+        (prisma.examGrade.upsert as any)({
           where: {
-            studentId_subjectId_academicYearId: {
+            tenantId_studentId_subjectId_academicYearId: {
+              tenantId,
               studentId: g.studentId,
               subjectId: g.subjectId,
               academicYearId: activeYear.id,
@@ -609,6 +650,7 @@ export const saveExamGrades = async (req: Request, res: Response, next: NextFunc
           },
           update: { score: g.score },
           create: {
+            tenantId,
             studentId: g.studentId,
             subjectId: g.subjectId,
             academicYearId: activeYear.id,
@@ -629,12 +671,15 @@ export const saveExamGrades = async (req: Request, res: Response, next: NextFunc
 // Export Exam template or existing grades for a Subject
 export const exportExamGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
+    
     const { subjectId } = req.query;
     if (!subjectId) {
       return res.status(400).json({ message: 'Subject ID is required' });
     }
 
-    const activeYear = await getActiveYear();
+    
+    const activeYear = await getActiveYear(tenantId);
     if (!activeYear) {
       return res.status(404).json({ message: 'No active academic year found' });
     }
@@ -645,6 +690,7 @@ export const exportExamGrades = async (req: Request, res: Response, next: NextFu
     }
 
     const students = await prisma.student.findMany({
+      where: { tenantId },
       orderBy: { name: 'asc' },
       include: {
         examGrades: {
@@ -748,6 +794,8 @@ export const exportExamGrades = async (req: Request, res: Response, next: NextFu
 // Import Exam Grades for a Subject
 export const importExamGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
+    
     const { subjectId } = req.body;
     if (!subjectId) {
       if (req.file) fs.unlinkSync(req.file.path);
@@ -758,7 +806,8 @@ export const importExamGrades = async (req: Request, res: Response, next: NextFu
       return res.status(400).json({ message: 'No Excel file uploaded' });
     }
 
-    const activeYear = await getActiveYear();
+    
+    const activeYear = await getActiveYear(tenantId);
     if (!activeYear) {
       fs.unlinkSync(req.file.path);
       return res.status(404).json({ message: 'No active academic year found' });
@@ -817,14 +866,15 @@ export const importExamGrades = async (req: Request, res: Response, next: NextFu
 
     await prisma.$transaction(async (tx) => {
       for (const item of gradesToUpsert) {
-        const student = await tx.student.findUnique({ where: { nis: item.nis } });
+        const student = await tx.student.findFirst({ where: { nis: item.nis, tenantId } });
         if (!student) {
           throw new Error(`Student with NIS '${item.nis}' not found in the database.`);
         }
 
-        await tx.examGrade.upsert({
+        await (tx.examGrade.upsert as any)({
           where: {
-            studentId_subjectId_academicYearId: {
+            tenantId_studentId_subjectId_academicYearId: {
+              tenantId,
               studentId: student.id,
               subjectId: subject.id,
               academicYearId: activeYear.id,
@@ -832,6 +882,7 @@ export const importExamGrades = async (req: Request, res: Response, next: NextFu
           },
           update: { score: item.score },
           create: {
+            tenantId,
             studentId: student.id,
             subjectId: subject.id,
             academicYearId: activeYear.id,
@@ -840,7 +891,7 @@ export const importExamGrades = async (req: Request, res: Response, next: NextFu
         });
         savedCount++;
       }
-    }).catch((err) => {
+    }, { maxWait: 100000, timeout: 100000 }).catch((err) => {
       dbErrors.push(err.message);
     });
 
@@ -869,9 +920,16 @@ export const importExamGrades = async (req: Request, res: Response, next: NextFu
 
 export const getGradeRecap = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const activeYear = await getActiveYear();
+    const tenantId = (req as any).user.tenantId;
+    
+    const activeYear = await getActiveYear((req as any).user.tenantId);
     if (!activeYear) {
-      return res.status(404).json({ message: 'No active academic year found' });
+      return res.status(200).json({ 
+        academicYear: null,
+        weight: { reportPercentage: 60.0, examPercentage: 40.0 },
+        recap: [],
+        schoolProfile: null,
+      });
     }
 
     const weight = activeYear.gradeWeights[0] || { reportPercentage: 60.0, examPercentage: 40.0 };
@@ -879,7 +937,7 @@ export const getGradeRecap = async (req: Request, res: Response, next: NextFunct
     const eWeight = weight.examPercentage / 100.0;
 
     // Fetch school profile
-    let profile: any = await prisma.schoolProfile.findFirst();
+    let profile: any = await prisma.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } });
     if (!profile) {
       profile = {
         id: 'default',
@@ -902,6 +960,7 @@ export const getGradeRecap = async (req: Request, res: Response, next: NextFunct
 
     // Fetch all students, report card grades, and exam grades
     const students = await prisma.student.findMany({
+      where: { tenantId },
       orderBy: { name: 'asc' },
       include: {
         reportGrades: {
@@ -916,8 +975,7 @@ export const getGradeRecap = async (req: Request, res: Response, next: NextFunct
     });
 
     // Fetch all subjects to make sure our list is complete
-    const subjects = await prisma.subject.findMany({
-      orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
+    const subjects = await prisma.subject.findMany({ where: { tenantId }, orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
     });
 
     const activeSemestersStr = (weight as any).activeSemesters || "7,8,9,10,11";
@@ -1023,7 +1081,9 @@ export const getGradeRecap = async (req: Request, res: Response, next: NextFunct
 
 export const exportGradeRecap = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const activeYear = await getActiveYear();
+    const tenantId = (req as any).user.tenantId;
+    
+    const activeYear = await getActiveYear((req as any).user.tenantId);
     if (!activeYear) {
       return res.status(404).json({ message: 'No active academic year found' });
     }
@@ -1033,6 +1093,7 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
     const eWeight = weight.examPercentage / 100.0;
 
     const students = await prisma.student.findMany({
+      where: { tenantId },
       orderBy: { name: 'asc' },
       include: {
         reportGrades: {
@@ -1046,8 +1107,7 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
       },
     });
 
-    const subjects = await prisma.subject.findMany({
-      orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
+    const subjects = await prisma.subject.findMany({ where: { tenantId }, orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
     });
 
     const activeSemestersStr = (weight as any).activeSemesters || "7,8,9,10,11";
@@ -1247,20 +1307,20 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
 // Get list of all subjects
 export const getMissingGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const activeYear = await getActiveYear();
+    const tenantId = (req as any).user.tenantId;
+    
+    const activeYear = await getActiveYear((req as any).user.tenantId);
     if (!activeYear) {
       return res.status(404).json({ message: 'No active academic year found' });
     }
 
     const [students, subjects, existingReportGrades, existingExamGrades] = await Promise.all([
-      prisma.student.findMany({ where: { isAlumni: false }, orderBy: { name: 'asc' } }),
-      prisma.subject.findMany({ orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }] }),
-      prisma.reportGrade.findMany({
-        where: { academicYearId: activeYear.id },
+      prisma.student.findMany({ where: { isAlumni: false, tenantId }, orderBy: { name: 'asc' } }),
+      prisma.subject.findMany({ where: { tenantId }, orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }] }),
+      prisma.reportGrade.findMany({ where: { tenantId, academicYearId: activeYear.id },
         select: { studentId: true, subjectId: true, semester: true },
       }),
-      prisma.examGrade.findMany({
-        where: { academicYearId: activeYear.id },
+      prisma.examGrade.findMany({ where: { tenantId, academicYearId: activeYear.id },
         select: { studentId: true, subjectId: true },
       }),
     ]);
@@ -1353,8 +1413,9 @@ export const getMissingGrades = async (req: Request, res: Response, next: NextFu
 
 export const getSubjects = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const subjects = await prisma.subject.findMany({
-      orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
+    const tenantId = (req as any).user.tenantId;
+    
+    const subjects = await prisma.subject.findMany({ where: { tenantId }, orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
     });
     return res.status(200).json(subjects);
   } catch (error) {
@@ -1365,14 +1426,15 @@ export const getSubjects = async (req: Request, res: Response, next: NextFunctio
 // Export Report template or existing grades for ALL Subjects
 export const exportAllReportGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
+    
     const { semester } = req.query;
-    const activeYear = await getActiveYear();
+    const activeYear = await getActiveYear((req as any).user.tenantId);
     if (!activeYear) {
       return res.status(404).json({ message: 'No active academic year found' });
     }
 
-    const subjects = await prisma.subject.findMany({
-      orderBy: [
+    const subjects = await prisma.subject.findMany({ where: { tenantId }, orderBy: [
         { group: 'asc' },
         { order: 'asc' },
         { name: 'asc' }
@@ -1382,6 +1444,7 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
     const targetSemester = semester ? parseInt(String(semester)) : null;
 
     const students = await prisma.student.findMany({
+      where: { tenantId },
       orderBy: { name: 'asc' },
       include: {
         reportGrades: {
@@ -1609,11 +1672,14 @@ export const exportAllReportGrades = async (req: Request, res: Response, next: N
 // Import Report card grades for ALL Subjects
 export const importAllReportGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
+    
     if (!req.file) {
       return res.status(400).json({ message: 'No Excel file uploaded' });
     }
 
-    const activeYear = await getActiveYear();
+    
+    const activeYear = await getActiveYear(tenantId);
     if (!activeYear) {
       fs.unlinkSync(req.file.path);
       return res.status(404).json({ message: 'No active academic year found' });
@@ -1628,7 +1694,7 @@ export const importAllReportGrades = async (req: Request, res: Response, next: N
       return res.status(400).json({ message: 'Worksheet not found' });
     }
 
-    const subjects = await prisma.subject.findMany();
+    const subjects = await prisma.subject.findMany({ where: { tenantId } });
     const colToSubjectId: Record<number, string> = {};
 
     // Scan Row 1 cells to map column indices to subjectIds dynamically
@@ -1722,14 +1788,15 @@ export const importAllReportGrades = async (req: Request, res: Response, next: N
 
     await prisma.$transaction(async (tx) => {
       for (const item of gradesToUpsert) {
-        const student = await tx.student.findUnique({ where: { nis: item.nis } });
+        const student = await tx.student.findFirst({ where: { nis: item.nis, tenantId } });
         if (!student) {
           throw new Error(`Student with NIS '${item.nis}' not found in the database.`);
         }
 
-        await tx.reportGrade.upsert({
+        await (tx.reportGrade.upsert as any)({
           where: {
-            studentId_subjectId_academicYearId_semester: {
+            tenantId_studentId_subjectId_academicYearId_semester: {
+              tenantId,
               studentId: student.id,
               subjectId: item.subjectId,
               academicYearId: activeYear.id,
@@ -1738,6 +1805,7 @@ export const importAllReportGrades = async (req: Request, res: Response, next: N
           },
           update: { score: item.score },
           create: {
+            tenantId,
             studentId: student.id,
             subjectId: item.subjectId,
             academicYearId: activeYear.id,
@@ -1747,7 +1815,7 @@ export const importAllReportGrades = async (req: Request, res: Response, next: N
         });
         savedCount++;
       }
-    }).catch((err) => {
+    }, { maxWait: 100000, timeout: 100000 }).catch((err) => {
       dbErrors.push(err.message);
     });
 
@@ -1771,13 +1839,14 @@ export const importAllReportGrades = async (req: Request, res: Response, next: N
 // Export Exam template or existing grades for ALL Subjects
 export const exportAllExamGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const activeYear = await getActiveYear();
+    const tenantId = (req as any).user.tenantId;
+    
+    const activeYear = await getActiveYear((req as any).user.tenantId);
     if (!activeYear) {
       return res.status(404).json({ message: 'No active academic year found' });
     }
 
-    const subjects = await prisma.subject.findMany({
-      orderBy: [
+    const subjects = await prisma.subject.findMany({ where: { tenantId }, orderBy: [
         { group: 'asc' },
         { order: 'asc' },
         { name: 'asc' }
@@ -1785,6 +1854,7 @@ export const exportAllExamGrades = async (req: Request, res: Response, next: Nex
     });
 
     const students = await prisma.student.findMany({
+      where: { tenantId },
       orderBy: { name: 'asc' },
       include: {
         examGrades: {
@@ -1916,11 +1986,14 @@ export const exportAllExamGrades = async (req: Request, res: Response, next: Nex
 // Import Exam grades for ALL Subjects
 export const importAllExamGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
+    
     if (!req.file) {
       return res.status(400).json({ message: 'No Excel file uploaded' });
     }
 
-    const activeYear = await getActiveYear();
+    
+    const activeYear = await getActiveYear(tenantId);
     if (!activeYear) {
       fs.unlinkSync(req.file.path);
       return res.status(404).json({ message: 'No active academic year found' });
@@ -1935,7 +2008,7 @@ export const importAllExamGrades = async (req: Request, res: Response, next: Nex
       return res.status(400).json({ message: 'Worksheet not found' });
     }
 
-    const subjects = await prisma.subject.findMany();
+    const subjects = await prisma.subject.findMany({ where: { tenantId } });
     const colToSubjectId: Record<number, string> = {};
 
     // Scan Row 1 cells to map column indices to subjectIds
@@ -2005,14 +2078,15 @@ export const importAllExamGrades = async (req: Request, res: Response, next: Nex
 
     await prisma.$transaction(async (tx) => {
       for (const item of gradesToUpsert) {
-        const student = await tx.student.findUnique({ where: { nis: item.nis } });
+        const student = await tx.student.findFirst({ where: { nis: item.nis, tenantId } });
         if (!student) {
           throw new Error(`Student with NIS '${item.nis}' not found in the database.`);
         }
 
-        await tx.examGrade.upsert({
+        await (tx.examGrade.upsert as any)({
           where: {
-            studentId_subjectId_academicYearId: {
+            tenantId_studentId_subjectId_academicYearId: {
+              tenantId,
               studentId: student.id,
               subjectId: item.subjectId,
               academicYearId: activeYear.id,
@@ -2020,6 +2094,7 @@ export const importAllExamGrades = async (req: Request, res: Response, next: Nex
           },
           update: { score: item.score },
           create: {
+            tenantId,
             studentId: student.id,
             subjectId: item.subjectId,
             academicYearId: activeYear.id,
@@ -2028,7 +2103,7 @@ export const importAllExamGrades = async (req: Request, res: Response, next: Nex
         });
         savedCount++;
       }
-    }).catch((err) => {
+    }, { maxWait: 100000, timeout: 100000 }).catch((err) => {
       dbErrors.push(err.message);
     });
 

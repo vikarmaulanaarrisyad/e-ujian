@@ -91,14 +91,14 @@ export default function GradeRecapPage() {
       
       doc.setFont('times', 'bold');
       doc.setFontSize(14);
-      doc.text('YAYASAN BUSTANUL HUDA DAWUHAN', pageWidth / 2, 14, { align: 'center' });
+      doc.text(data?.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN", pageWidth / 2, 14, { align: 'center' });
       
       doc.setFontSize(18);
       doc.text(data?.schoolProfile?.name || 'MI BUSTANUL HUDA 01 DAWUHAN', pageWidth / 2, 21, { align: 'center' });
       
       doc.setFont('times', 'normal');
       doc.setFontSize(10);
-      doc.text(`TERAKREDITASI A     NPSN : ${data?.schoolProfile?.npsn || '60713609'}    NSM : 111233280040`, pageWidth / 2, 27, { align: 'center' });
+      doc.text(`TERAKREDITASI A     NPSN : ${data?.schoolProfile?.npsn || '60713609'}    NSM : ${data?.schoolProfile?.nsm || "-"}`, pageWidth / 2, 27, { align: 'center' });
       doc.text(data?.schoolProfile?.address || '-', pageWidth / 2, 32, { align: 'center' });
       
       // KOP Double Line

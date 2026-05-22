@@ -1,0 +1,238 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../node_modules/@prisma/client-mysql"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+
+
+
+
+
+
+
+
+model Tenant {
+  id   String @id @default(uuid())
+  name String
+  slug String @unique
+
+  users          User[]
+  schoolProfiles SchoolProfile[]
+  academicYears  AcademicYear[]
+  students       Student[]
+  subjects       Subject[]
+  gradeWeights   GradeWeight[]
+  reportGrades   ReportGrade[]
+  examGrades     ExamGrade[]
+  activityLogs   ActivityLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tenants")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  username  String   @unique
+  password  String
+  name      String
+  role String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  activityLogs ActivityLog[]
+
+  @@map("users")
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  userId      String?  @map("user_id")
+  userName    String   @map("user_name")
+  userRole    String   @map("user_role")
+  action      String
+  entity      String
+  entityId    String?  @map("entity_id")
+  description String   @db.Text
+  metadata    String?
+  ipAddress   String?  @map("ip_address")
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+model SchoolProfile {
+  id              String   @id @default(uuid())
+  tenantId        String   @unique @map("tenant_id")
+  name            String
+  npsn            String?
+  nsm             String?
+  address         String   @db.Text
+  headmaster      String   @map("headmaster_name")
+  headmasterNip   String?  @map("headmaster_nip")
+  city            String?  // Nama Daerah / Kabupaten
+  district        String?  // Kecamatan
+  province        String?  // Provinsi
+  logoUrl         String?  @map("logo_url")
+  sklNumberFormat String?  @map("skl_number_format") // Format nomor SKL, e.g. "B.{seq}/MI.BH/{year}"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("school_profiles")
+}
+
+model AcademicYear {
+  id          String       @id @default(uuid())
+  tenantId    String       @map("tenant_id")
+  year        String       // e.g. "2025/2026"
+  semester String // ODD or EVEN
+  isActive    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Relations
+  gradeWeights GradeWeight[]
+  reportGrades ReportGrade[]
+  examGrades   ExamGrade[]
+
+  @@unique([tenantId, year, semester])
+  @@map("academic_years")
+}
+
+model Student {
+  id                String    @id @default(uuid())
+  tenantId          String    @map("tenant_id")
+  nis               String
+  nisn              String
+  name              String
+  gender String
+  class             String    @default("6")
+  placeOfBirth      String?   @map("place_of_birth")
+  dateOfBirth       DateTime? @map("date_of_birth")
+  parentName        String?   @map("parent_name")
+  photoUrl          String?   @map("photo_url") // Foto Siswa
+  // Graduation fields
+  isGraduated       Boolean   @default(false) @map("is_graduated")
+  graduationDate    DateTime? @map("graduation_date")
+  certificateNumber String?   @map("certificate_number")
+  sklNumber         String?   @map("skl_number") // Nomor SKL yang ditetapkan
+  isAlumni          Boolean   @default(false) @map("is_alumni")
+  alumniYear        String?   @map("alumni_year")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Relations
+  reportGrades ReportGrade[]
+  examGrades   ExamGrade[]
+
+  @@unique([tenantId, nis])
+  @@unique([tenantId, nisn])
+  @@unique([tenantId, certificateNumber])
+  @@map("students")
+}
+
+model Subject {
+  id        String       @id @default(uuid())
+  tenantId  String       @map("tenant_id")
+  name      String
+  code      String
+  group String
+  order     Int          @default(0)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Relations
+  reportGrades ReportGrade[]
+  examGrades   ExamGrade[]
+
+  @@unique([tenantId, code])
+  @@map("subjects")
+}
+
+model GradeWeight {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  reportPercentage Float    @default(60.0) // Bobot Nilai Rapor (e.g. 60.0)
+  examPercentage   Float    @default(40.0) // Bobot Nilai Ujian (e.g. 40.0)
+  activeSemesters  String   @default("7,8,9,10,11") @map("active_semesters")
+  academicYearId   String   @map("academic_year_id")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@map("grade_weights")
+}
+
+model ReportGrade {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  studentId      String   @map("student_id")
+  subjectId      String   @map("subject_id")
+  academicYearId String   @map("academic_year_id")
+  semester       Int      // 7, 8, 9, 10, 11 (Kelas 4 Ganjil to Kelas 6 Ganjil)
+  score          Float    @db.Double // Nilai (e.g. 0.0 - 100.0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, studentId, subjectId, academicYearId, semester])
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([academicYearId])
+  @@map("report_grades")
+}
+
+model ExamGrade {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  studentId      String   @map("student_id")
+  subjectId      String   @map("subject_id")
+  academicYearId String   @map("academic_year_id")
+  score          Float    @db.Double // Nilai Ujian (e.g. 0.0 - 100.0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, studentId, subjectId, academicYearId])
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([academicYearId])
+  @@map("exam_grades")
+}

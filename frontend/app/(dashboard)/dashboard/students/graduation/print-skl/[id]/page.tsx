@@ -391,10 +391,10 @@ export default function PrintSKLPage() {
 
               {/* Teks tengah */}
               <div className="kop-text">
-                <span className="kop-yayasan">YAYASAN BUSTANUL HUDA DAWUHAN</span>
+                <span className="kop-yayasan">{schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN"}</span>
                 <span className="kop-sekolah">{schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01'}</span>
                 <span className="kop-akreditasi">
-                  Terakreditasi &ldquo;A&rdquo;&ensp;|&ensp;NPSN: {schoolProfile.npsn || '60713609'}&ensp;|&ensp;NSM: 111233280040
+                  Terakreditasi &ldquo;A&rdquo;&ensp;|&ensp;NPSN: {schoolProfile.npsn || '60713609'}&ensp;|&ensp;NSM: {schoolProfile?.nsm || "-"}
                 </span>
                 <span className="kop-alamat">{schoolProfile.address}</span>
               </div>

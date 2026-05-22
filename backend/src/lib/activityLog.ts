@@ -33,7 +33,7 @@ export async function logActivity({
       req.socket?.remoteAddress ||
       undefined;
 
-    await prisma.activityLog.create({
+    await (prisma.activityLog.create as any)({
       data: {
         userId: user.id,
         userName: user.name,
@@ -42,7 +42,7 @@ export async function logActivity({
         entity,
         entityId: entityId ?? null,
         description,
-        metadata: metadata ?? undefined,
+        metadata: metadata ? JSON.stringify(metadata) : null,
         ipAddress: ip ?? null,
       },
     });

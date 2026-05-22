@@ -29,10 +29,11 @@ const resolveLogoUrl = (profile: any, req: Request) => {
 export const getStudentDocumentData = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const tenantId = (req as any).user.tenantId;
 
     // Fetch active academic year and grade weights
     const activeYear = await prisma.academicYear.findFirst({
-      where: { isActive: true },
+      where: { isActive: true, tenantId },
       include: { gradeWeights: true },
     });
 
@@ -45,7 +46,7 @@ export const getStudentDocumentData = async (req: Request, res: Response, next: 
     const eWeight = weight.examPercentage / 100.0;
 
     // Fetch school profile
-    let profile: any = await prisma.schoolProfile.findFirst() || defaultProfile();
+    let profile: any = await prisma.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
     profile = resolveLogoUrl({ ...profile }, req);
 
     // Fetch student with all their grades
@@ -73,6 +74,7 @@ export const getStudentDocumentData = async (req: Request, res: Response, next: 
 
     // Fetch all subjects to build a complete list of grades
     const subjects = await prisma.subject.findMany({
+      where: { tenantId },
       orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
     });
 
@@ -154,9 +156,10 @@ export const getStudentDocumentData = async (req: Request, res: Response, next: 
 // Get all graduated students data for batch SKL printing
 export const getAllGraduatedSklData = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     // Fetch active academic year
     const activeYear = await prisma.academicYear.findFirst({
-      where: { isActive: true },
+      where: { isActive: true, tenantId },
       include: { gradeWeights: true },
     });
 
@@ -165,12 +168,12 @@ export const getAllGraduatedSklData = async (req: Request, res: Response, next: 
     }
 
     // Fetch school profile
-    let profile: any = await prisma.schoolProfile.findFirst() || defaultProfile();
+    let profile: any = await prisma.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
     profile = resolveLogoUrl({ ...profile }, req);
 
     // Fetch all graduated students ordered by sklNumber then name
     const students = await prisma.student.findMany({
-      where: { isGraduated: true },
+      where: { isGraduated: true, tenantId },
       orderBy: [{ sklNumber: 'asc' }, { name: 'asc' }],
     });
 

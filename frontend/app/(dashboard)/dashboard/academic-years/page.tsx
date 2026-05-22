@@ -41,7 +41,7 @@ export default function AcademicYearPage() {
   const [reportWeight, setReportWeight] = useState(60);
   const [examWeight, setExamWeight] = useState(40);
 
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = user?.role === 'SUPER_ADMIN';
 
   const fetchAcademicYears = async () => {
     setLoading(true);

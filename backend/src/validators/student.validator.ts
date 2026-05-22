@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Gender } from '@prisma/client';
+import { Gender } from '../types/enums';
 
 export const createStudentSchema = z.object({
   nis: z.string().min(3, 'NIS must be at least 3 characters'),

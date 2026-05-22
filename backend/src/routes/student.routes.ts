@@ -17,7 +17,7 @@ import {
 import { authenticateJWT } from '../middlewares/auth.middleware';
 import { requireRoles } from '../middlewares/rbac.middleware';
 import { upload } from '../middlewares/upload.middleware';
-import { Role } from '@prisma/client';
+import { Role } from '../types/enums';
 
 const router = Router();
 

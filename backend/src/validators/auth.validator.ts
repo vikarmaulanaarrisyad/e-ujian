@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Role } from '@prisma/client';
+import { Role } from '../types/enums';
 
 export const loginSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters long'),

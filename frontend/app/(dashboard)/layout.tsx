@@ -22,7 +22,11 @@ import {
   Calendar,
   Shield,
   ClipboardList,
+  Building2,
+  DatabaseBackup,
 } from 'lucide-react';
+// Import removed
+import SyncDatabase from '@/components/SyncDatabase';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, loading } = useAuth();
@@ -39,19 +43,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'GURU', 'STAFF'] },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'GURU', 'STAFF'] },
+    { name: 'Manajemen Lembaga', href: '/dashboard/tenants', icon: Building2, roles: ['SUPER_ADMIN'] },
     { name: 'Profil Madrasah', href: '/dashboard/school', icon: School, roles: ['ADMIN'] },
-    { name: 'Tahun Ajaran', href: '/dashboard/academic-years', icon: Calendar, roles: ['ADMIN'] },
+    { name: 'Tahun Ajaran', href: '/dashboard/academic-years', icon: Calendar, roles: ['SUPER_ADMIN'] },
     { name: 'Manajemen Akses', href: '/dashboard/users', icon: Shield, roles: ['ADMIN'] },
     { name: 'Data Siswa', href: '/dashboard/students', icon: Users, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Data Alumni', href: '/dashboard/alumni', icon: GraduationCap, roles: ['ADMIN', 'GURU', 'STAFF'] },
-    { name: 'Mata Pelajaran', href: '/dashboard/subjects', icon: BookMarked, roles: ['ADMIN'] },
+    { name: 'Mata Pelajaran', href: '/dashboard/subjects', icon: BookMarked, roles: ['SUPER_ADMIN'] },
     { name: 'Input Nilai Rapor', href: '/dashboard/grades/reports', icon: BookOpen, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Input Nilai Ujian', href: '/dashboard/grades/exams', icon: FileSpreadsheet, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Rekap Nilai', href: '/dashboard/grades/recap', icon: FileSpreadsheet, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Nilai Belum Masuk', href: '/dashboard/grades/missing', icon: AlertTriangle, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Kelulusan Siswa', href: '/dashboard/students/graduation', icon: Award, roles: ['ADMIN', 'STAFF'] },
     { name: 'Pengaturan Bobot', href: '/dashboard/settings', icon: Settings, roles: ['ADMIN'] },
+    { name: 'Backup & Restore', href: '/dashboard/backup', icon: DatabaseBackup, roles: ['SUPER_ADMIN'] },
     { name: 'Riwayat Aktivitas', href: '/dashboard/activity-logs', icon: ClipboardList, roles: ['ADMIN'] },
   ];
 
@@ -91,7 +97,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <div>
               <h1 className="text-sm font-bold bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent leading-none">SIPANMU</h1>
-              <span className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">MI Bustanul Huda</span>
+              <span className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">{user?.tenantName || 'Memuat Lembaga...'}</span>
             </div>
           </div>
           <button 
@@ -166,8 +172,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Menu className="w-5 h-5" />
             </button>
             <div className="hidden sm:block">
-              <p className="text-xs text-slate-550 font-semibold tracking-wider uppercase">Tahun Pelajaran Pelaporan</p>
-              <p className="text-xs font-bold text-indigo-400">TP 2025/2026 - GANJIL (AKTIF)</p>
+              <p className="text-xs text-slate-550 font-semibold tracking-wider uppercase">Tahun Pelajaran</p>
+              <p className="text-xs font-bold text-indigo-400">AKTIF TAHUN INI</p>
             </div>
           </div>
 
@@ -176,6 +182,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest block">User Aktif</span>
               <span className="text-xs font-bold text-slate-350">{user?.name}</span>
             </div>
+            <SyncDatabase />
+            {/* Tenant selector removed */}
             <div className="w-8.5 h-8.5 rounded-full bg-slate-800 flex items-center justify-center font-bold text-xs text-slate-400 border border-slate-700">
               {user?.username.charAt(0).toUpperCase()}
             </div>

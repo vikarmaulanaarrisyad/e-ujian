@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../db';
-import { SemesterType } from '@prisma/client';
+import { SemesterType } from '../types/enums';
 import { logActivity } from '../lib/activityLog';
 
 export const getAllAcademicYears = async (req: Request, res: Response, next: NextFunction) => {
@@ -24,12 +24,10 @@ export const createAcademicYear = async (req: Request, res: Response, next: Next
   try {
     const { year, semester } = req.body; // e.g., year: "2026/2027", semester: "ODD"
 
-    const existing = await prisma.academicYear.findUnique({
+    const existing = await prisma.academicYear.findFirst({
       where: {
-        year_semester: {
-          year,
-          semester: semester as SemesterType,
-        },
+        year,
+        semester: semester as SemesterType,
       },
     });
 
@@ -37,28 +35,32 @@ export const createAcademicYear = async (req: Request, res: Response, next: Next
       return res.status(400).json({ message: 'Tahun Ajaran dan Semester ini sudah ada.' });
     }
 
-    const academicYear = await prisma.academicYear.create({
+    const academicYear = await (prisma.academicYear.create as any)({
       data: {
         year,
         semester: semester as SemesterType,
         isActive: false, // by default not active until explicitly activated
-        gradeWeights: {
-          create: {
-            reportPercentage: 60.0,
-            examPercentage: 40.0,
-          },
-        },
       },
-      include: {
-        gradeWeights: true,
+    });
+
+    await (prisma.gradeWeight.create as any)({
+      data: {
+        academicYearId: academicYear.id,
+        reportPercentage: 60.0,
+        examPercentage: 40.0,
       },
+    });
+
+    const completeAcademicYear = await prisma.academicYear.findUnique({
+      where: { id: academicYear.id },
+      include: { gradeWeights: true },
     });
 
     logActivity({ req, action: 'CREATE_ACADEMIC_YEAR', entity: 'AcademicYear', entityId: academicYear.id, description: `Membuat tahun ajaran baru: ${year} - ${semester}` });
 
     return res.status(201).json({
       message: 'Tahun Ajaran berhasil dibuat.',
-      data: academicYear,
+      data: completeAcademicYear,
     });
   } catch (error) {
     next(error);
@@ -78,11 +80,11 @@ export const activateAcademicYear = async (req: Request, res: Response, next: Ne
     // Transaction to ensure data consistency
     await prisma.$transaction([
       // Deactivate all
-      prisma.academicYear.updateMany({
+      (prisma.academicYear.updateMany as any)({
         data: { isActive: false },
       }),
       // Activate the selected one
-      prisma.academicYear.update({
+      (prisma.academicYear.update as any)({
         where: { id },
         data: { isActive: true },
       }),
@@ -116,7 +118,7 @@ export const updateGradeWeight = async (req: Request, res: Response, next: NextF
 
     let gradeWeight;
     if (academicYear.gradeWeights.length > 0) {
-      gradeWeight = await prisma.gradeWeight.update({
+      gradeWeight = await (prisma.gradeWeight.update as any)({
         where: { id: academicYear.gradeWeights[0].id },
         data: {
           reportPercentage: Number(reportPercentage),
@@ -124,7 +126,7 @@ export const updateGradeWeight = async (req: Request, res: Response, next: NextF
         },
       });
     } else {
-      gradeWeight = await prisma.gradeWeight.create({
+      gradeWeight = await (prisma.gradeWeight.create as any)({
         data: {
           academicYearId: id,
           reportPercentage: Number(reportPercentage),

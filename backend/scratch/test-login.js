@@ -1,21 +1,17 @@
-async function testLogin() {
+async function test() {
   try {
-    const res = await fetch('http://localhost:5000/api/auth/login', {
+    const res = await fetch('http://127.0.0.1:5000/api/auth/login', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        username: 'admin',
+        username: 'admin_dawuhan1',
         password: 'Admin123!'
       })
     });
-    console.log('Login Response Status:', res.status);
     const data = await res.json();
-    console.log('Response data:', data);
-  } catch (error) {
-    console.error('Error during fetch:', error);
+    console.log('Login Status:', res.status, data);
+  } catch (err) {
+    console.error('Login Failed!', err);
   }
 }
-
-testLogin();
+test();

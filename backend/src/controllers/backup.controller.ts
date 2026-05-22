@@ -11,6 +11,7 @@ import path from 'path';
 
 export const exportBackup = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user.tenantId;
     // Fetch all tables in FK-safe order
     const [
       users,
@@ -22,14 +23,14 @@ export const exportBackup = async (req: Request, res: Response, next: NextFuncti
       reportGrades,
       examGrades,
     ] = await Promise.all([
-      prisma.user.findMany(),
-      prisma.schoolProfile.findMany(),
-      prisma.academicYear.findMany(),
-      prisma.subject.findMany(),
-      prisma.gradeWeight.findMany(),
-      prisma.student.findMany(),
-      prisma.reportGrade.findMany(),
-      prisma.examGrade.findMany(),
+      prisma.user.findMany({ where: { tenantId } }),
+      prisma.schoolProfile.findMany({ where: { tenantId } }),
+      prisma.academicYear.findMany({ where: { tenantId } }),
+      prisma.subject.findMany({ where: { tenantId } }),
+      prisma.gradeWeight.findMany({ where: { tenantId } }),
+      prisma.student.findMany({ where: { tenantId } }),
+      prisma.reportGrade.findMany({ where: { tenantId } }),
+      prisma.examGrade.findMany({ where: { tenantId } }),
     ]);
 
     const backup = {
@@ -177,28 +178,28 @@ export const importBackup = async (req: Request, res: Response, next: NextFuncti
 
         // 2. Re-insert in FK-safe order
         if (users.length > 0) {
-          await tx.user.createMany({ data: users.map(sanitizeUser) });
+          await (tx.user.createMany as any)({ data: users.map(sanitizeUser) });
         }
         if (schoolProfiles.length > 0) {
-          await tx.schoolProfile.createMany({ data: schoolProfiles.map(stripTimestamps) });
+          await (tx.schoolProfile.createMany as any)({ data: schoolProfiles.map(stripTimestamps) });
         }
         if (academicYears.length > 0) {
-          await tx.academicYear.createMany({ data: academicYears.map(stripTimestamps) });
+          await (tx.academicYear.createMany as any)({ data: academicYears.map(stripTimestamps) });
         }
         if (subjects.length > 0) {
-          await tx.subject.createMany({ data: subjects.map(stripTimestamps) });
+          await (tx.subject.createMany as any)({ data: subjects.map(stripTimestamps) });
         }
         if (gradeWeights.length > 0) {
-          await tx.gradeWeight.createMany({ data: gradeWeights.map(stripTimestamps) });
+          await (tx.gradeWeight.createMany as any)({ data: gradeWeights.map(stripTimestamps) });
         }
         if (students.length > 0) {
-          await tx.student.createMany({ data: students.map(sanitizeStudent) });
+          await (tx.student.createMany as any)({ data: students.map(sanitizeStudent) });
         }
         if (reportGrades.length > 0) {
-          await tx.reportGrade.createMany({ data: reportGrades.map(stripTimestamps) });
+          await (tx.reportGrade.createMany as any)({ data: reportGrades.map(stripTimestamps) });
         }
         if (examGrades.length > 0) {
-          await tx.examGrade.createMany({ data: examGrades.map(stripTimestamps) });
+          await (tx.examGrade.createMany as any)({ data: examGrades.map(stripTimestamps) });
         }
       },
       { timeout: 60000 }
