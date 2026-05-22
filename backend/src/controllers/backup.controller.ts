@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import prisma from '../db';
 import fs from 'fs';
 import { logActivity } from '../lib/activityLog';
+import AdmZip from 'adm-zip';
+import path from 'path';
 
 // ==========================================
 // BACKUP EXPORT
@@ -58,15 +60,41 @@ export const exportBackup = async (req: Request, res: Response, next: NextFuncti
       },
     };
 
+    const zip = new AdmZip();
+    
+    // Add database JSON
+    const jsonContent = JSON.stringify(backup, null, 2);
+    zip.addFile('backup_data.json', Buffer.from(jsonContent, 'utf-8'));
+    
+    // Add uploads folder if it exists
+    const uploadsPath = path.join(process.cwd(), 'uploads');
+    if (fs.existsSync(uploadsPath)) {
+      // Check if folder is not empty before adding
+      const files = fs.readdirSync(uploadsPath);
+      if (files.length > 0) {
+        zip.addLocalFolder(uploadsPath, 'uploads');
+      }
+    }
+    
+    const zipBuffer = zip.toBuffer();
+
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
     const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
-    const fileName = `backup_sipanmu_${timestamp}.json`;
+    const fileName = `backup_sipanmu_${timestamp}.zip`;
 
-    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    logActivity({ req, action: 'EXPORT_BACKUP', entity: 'Backup', description: `Mengunduh backup database: ${fileName}`, metadata: { fileName, totalRecords: backup.metadata.totalRecords } });
-    return res.status(200).json(backup);
+    
+    logActivity({ 
+      req, 
+      action: 'EXPORT_BACKUP', 
+      entity: 'Backup', 
+      description: `Mengunduh backup lengkap (database + uploads): ${fileName}`, 
+      metadata: { fileName, totalRecords: backup.metadata.totalRecords } 
+    });
+    
+    return res.status(200).send(zipBuffer);
   } catch (error) {
     next(error);
   }
@@ -82,16 +110,39 @@ export const importBackup = async (req: Request, res: Response, next: NextFuncti
   }
 
   const filePath = req.file.path;
+  const isZip = req.file.originalname.endsWith('.zip') || req.file.mimetype === 'application/zip';
 
   try {
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    let backup: any;
+    let backupContent = '';
 
+    if (isZip) {
+      const zip = new AdmZip(filePath);
+      const zipEntries = zip.getEntries();
+      
+      // Find backup_data.json inside zip
+      const dataEntry = zipEntries.find(entry => entry.entryName === 'backup_data.json');
+      if (!dataEntry) {
+        fs.unlinkSync(filePath);
+        return res.status(400).json({ message: 'File backup (.zip) tidak valid. File backup_data.json tidak ditemukan.' });
+      }
+
+      backupContent = dataEntry.getData().toString('utf8');
+
+      // Extract uploads/ folder into root uploads/ directory if it exists in zip
+      const hasUploads = zipEntries.some(entry => entry.entryName.startsWith('uploads/'));
+      if (hasUploads) {
+        zip.extractEntryTo('uploads/', process.cwd(), true, true);
+      }
+    } else {
+      backupContent = fs.readFileSync(filePath, 'utf-8');
+    }
+
+    let backup: any;
     try {
-      backup = JSON.parse(raw);
+      backup = JSON.parse(backupContent);
     } catch {
       fs.unlinkSync(filePath);
-      return res.status(400).json({ message: 'File backup tidak valid. Pastikan file adalah JSON yang benar.' });
+      return res.status(400).json({ message: 'File backup tidak valid. Pastikan file adalah format JSON atau ZIP yang benar.' });
     }
 
     // Validate structure
@@ -155,10 +206,18 @@ export const importBackup = async (req: Request, res: Response, next: NextFuncti
 
     fs.unlinkSync(filePath);
 
-    logActivity({ req, action: 'IMPORT_BACKUP', entity: 'Backup', description: `Me-restore database dari file backup (dibuat: ${backup.metadata?.createdAt})`, metadata: { restoredCounts: { students: students.length, reportGrades: reportGrades.length, examGrades: examGrades.length } } });
+    logActivity({ 
+      req, 
+      action: 'IMPORT_BACKUP', 
+      entity: 'Backup', 
+      description: `Me-restore database dari file backup (dibuat: ${backup.metadata?.createdAt})`, 
+      metadata: { restoredCounts: { students: students.length, reportGrades: reportGrades.length, examGrades: examGrades.length } } 
+    });
 
     return res.status(200).json({
-      message: 'Database berhasil di-restore dari file backup.',
+      message: isZip 
+        ? 'Database dan file uploads berhasil di-restore dari file backup.'
+        : 'Database berhasil di-restore dari file backup.',
       restoredAt: new Date().toISOString(),
       backupCreatedAt: backup.metadata?.createdAt,
       restored: {

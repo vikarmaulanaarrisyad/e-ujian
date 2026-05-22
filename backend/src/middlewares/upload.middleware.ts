@@ -34,13 +34,13 @@ export const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
 
-// ── JSON uploader for database backup restore ──
+// ── Backup uploader for database backup restore (.json, .zip) ──
 const jsonFileFilter = (req: any, file: any, cb: any) => {
   const ext = path.extname(file.originalname).toLowerCase();
-  if (ext === '.json') {
+  if (ext === '.json' || ext === '.zip') {
     cb(null, true);
   } else {
-    cb(new Error('Only JSON backup files (.json) are allowed'), false);
+    cb(new Error('Hanya file backup (.json, .zip) yang diperbolehkan'), false);
   }
 };
 

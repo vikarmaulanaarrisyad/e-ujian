@@ -134,9 +134,9 @@ export default function SettingsPage() {
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
       const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
-      const fileName = `backup_sipanmu_${ts}.json`;
+      const fileName = `backup_sipanmu_${ts}.zip`;
 
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/json' }));
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/zip' }));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', fileName);
@@ -148,7 +148,7 @@ export default function SettingsPage() {
       const timeStr = now.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
       localStorage.setItem('sipanmu_last_backup', timeStr);
       setLastBackupTime(timeStr);
-      showToast('Backup database berhasil diunduh!', 'success');
+      showToast('Backup lengkap berhasil diunduh!', 'success');
     } catch (err: any) {
       showToast(err.response?.data?.message || 'Gagal mengunduh backup.', 'error');
     } finally {
@@ -341,9 +341,9 @@ export default function SettingsPage() {
             <Database className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-bold text-slate-200">Backup &amp; Restore Database</h3>
+            <h3 className="font-bold text-slate-200">Backup &amp; Restore Lengkap</h3>
             <p className="text-[10px] text-slate-500 mt-0.5">
-              Ekspor semua data ke file JSON atau pulihkan dari backup sebelumnya.
+              Ekspor seluruh database dan file unggahan ke file ZIP atau pulihkan dari backup sebelumnya.
             </p>
           </div>
         </div>
@@ -354,18 +354,15 @@ export default function SettingsPage() {
             <FileJson className="w-3.5 h-3.5 text-amber-400" /> Yang tercakup dalam backup:
           </p>
           <ul className="space-y-1 pl-5 list-disc text-slate-500">
-            <li>Data pengguna (user &amp; password terenkripsi)</li>
-            <li>Profil madrasah &amp; tahun ajaran</li>
-            <li>Semua mata pelajaran &amp; konfigurasi bobot</li>
-            <li>Data siswa (NIS, NISN, nama, dll.)</li>
-            <li>Semua nilai rapor (Smt 7–11) &amp; nilai ujian</li>
+            <li>Data database (siswa, nilai rapor, ujian, mapel, bobot, user)</li>
+            <li><span className="text-amber-400 font-medium">File media unggahan</span> (foto siswa &amp; logo sekolah)</li>
           </ul>
         </div>
 
         {/* Download Backup */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-slate-300">Unduh Backup</p>
+            <p className="text-xs font-semibold text-slate-300">Unduh Backup Lengkap</p>
             <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1.5">
               <Clock className="w-3 h-3" />
               {lastBackupTime ? `Terakhir: ${lastBackupTime}` : 'Belum pernah backup'}
@@ -381,7 +378,7 @@ export default function SettingsPage() {
             ) : (
               <Download className="w-4 h-4" />
             )}
-            {isDownloadingBackup ? 'Menyiapkan...' : 'Unduh Backup (.json)'}
+            {isDownloadingBackup ? 'Menyiapkan...' : 'Unduh Backup (.zip)'}
           </button>
         </div>
 
@@ -392,7 +389,7 @@ export default function SettingsPage() {
           <div>
             <p className="text-xs font-semibold text-slate-300">Restore dari Backup</p>
             <p className="text-[10px] text-slate-500 mt-0.5">
-              Upload file backup (.json) untuk memulihkan seluruh data database.
+              Upload file backup (.zip atau .json) untuk memulihkan seluruh data database dan media.
             </p>
           </div>
 
@@ -408,7 +405,7 @@ export default function SettingsPage() {
             type="file"
             ref={fileInputRef}
             onChange={handleFileSelect}
-            accept=".json"
+            accept=".json,.zip"
             className="hidden"
           />
           <button
@@ -453,7 +450,7 @@ export default function SettingsPage() {
             <div className="px-6 py-5 space-y-4">
               <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-900/40 text-xs text-rose-300 space-y-2 leading-relaxed">
                 <p><strong>⚠️ Tindakan ini tidak dapat dibatalkan.</strong></p>
-                <p>Seluruh data database saat ini akan dihapus dan diganti dengan data dari:</p>
+                <p>Seluruh data database (dan file uploads jika menggunakan file .zip) saat ini akan dihapus dan diganti dengan data dari:</p>
                 <p className="font-mono text-rose-400 text-[11px] bg-rose-950/40 px-2 py-1 rounded">
                   {pendingFile?.name}
                 </p>
