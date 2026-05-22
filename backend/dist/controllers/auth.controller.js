@@ -9,6 +9,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_1 = __importDefault(require("../db"));
 const env_1 = require("../config/env");
 const auth_validator_1 = require("../validators/auth.validator");
+const activityLog_1 = require("../lib/activityLog");
 const login = async (req, res, next) => {
     try {
         const validation = auth_validator_1.loginSchema.safeParse(req.body);
@@ -30,7 +31,7 @@ const login = async (req, res, next) => {
             return res.status(401).json({ message: 'Invalid username or password' });
         }
         const token = jsonwebtoken_1.default.sign({ id: user.id, username: user.username, role: user.role }, env_1.env.JWT_SECRET, { expiresIn: env_1.env.JWT_EXPIRES_IN });
-        return res.status(200).json({
+        const response = res.status(200).json({
             message: 'Login successful',
             token,
             user: {
@@ -40,6 +41,10 @@ const login = async (req, res, next) => {
                 role: user.role,
             },
         });
+        // Log login — set req.user manually karena middleware belum dijalankan
+        req.user = { id: user.id, username: user.username, name: user.name, role: user.role };
+        (0, activityLog_1.logActivity)({ req, action: 'LOGIN', entity: 'Auth', description: `${user.name} (${user.role}) berhasil login` });
+        return response;
     }
     catch (error) {
         next(error);

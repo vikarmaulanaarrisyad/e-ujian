@@ -31,4 +31,6 @@ router.post('/exams/import-all', (0, rbac_middleware_1.requireRoles)(client_1.Ro
 // Final calculated grade recap
 router.get('/recap', (0, rbac_middleware_1.requireRoles)(client_1.Role.ADMIN, client_1.Role.GURU, client_1.Role.STAFF), grade_controller_1.getGradeRecap);
 router.get('/recap/export', (0, rbac_middleware_1.requireRoles)(client_1.Role.ADMIN, client_1.Role.GURU, client_1.Role.STAFF), grade_controller_1.exportGradeRecap);
+// Missing grades checker
+router.get('/missing', (0, rbac_middleware_1.requireRoles)(client_1.Role.ADMIN, client_1.Role.GURU, client_1.Role.STAFF), grade_controller_1.getMissingGrades);
 exports.default = router;

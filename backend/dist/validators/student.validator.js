@@ -16,5 +16,12 @@ exports.createStudentSchema = zod_1.z.object({
         return arg;
     }, zod_1.z.date().optional()),
     parentName: zod_1.z.string().optional(),
+    isGraduated: zod_1.z.boolean().default(false).optional(),
+    graduationDate: zod_1.z.preprocess((arg) => {
+        if (typeof arg === 'string' && arg)
+            return new Date(arg);
+        return arg;
+    }, zod_1.z.date().optional().nullable()),
+    certificateNumber: zod_1.z.string().optional().nullable(),
 });
 exports.updateStudentSchema = exports.createStudentSchema.partial();

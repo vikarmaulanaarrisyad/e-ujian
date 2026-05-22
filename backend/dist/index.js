@@ -8,11 +8,14 @@ const cors_1 = __importDefault(require("cors"));
 const env_1 = require("./config/env");
 const routes_1 = __importDefault(require("./routes"));
 const error_middleware_1 = require("./middlewares/error.middleware");
+const path_1 = __importDefault(require("path"));
 const app = (0, express_1.default)();
 // Middlewares
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
+// Static files
+app.use('/uploads', express_1.default.static(path_1.default.join(process.cwd(), 'uploads')));
 // Routes
 app.use('/api', routes_1.default);
 // Base route

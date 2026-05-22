@@ -3,11 +3,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.importStudents = exports.exportStudents = exports.getStudentTemplate = exports.deleteStudent = exports.updateStudent = exports.createStudent = exports.getStudentById = exports.getAllStudents = void 0;
+exports.archiveStudents = exports.uploadPhotos = exports.batchAssignSklNumbers = exports.batchUpdateGraduation = exports.updateGraduationStatus = exports.importStudents = exports.exportStudents = exports.getStudentTemplate = exports.deleteStudent = exports.updateStudent = exports.createStudent = exports.getStudentById = exports.getAllStudents = void 0;
 const exceljs_1 = __importDefault(require("exceljs"));
 const db_1 = __importDefault(require("../db"));
 const student_validator_1 = require("../validators/student.validator");
 const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+const adm_zip_1 = __importDefault(require("adm-zip"));
+const activityLog_1 = require("../lib/activityLog");
 // Get all students
 const getAllStudents = async (req, res, next) => {
     try {
@@ -22,6 +25,9 @@ const getAllStudents = async (req, res, next) => {
         if (className) {
             filter.class = String(className);
         }
+        // Alumni filter
+        const isAlumniParam = req.query.alumni === 'true';
+        filter.isAlumni = isAlumniParam;
         const students = await db_1.default.student.findMany({
             where: filter,
             orderBy: { name: 'asc' },
@@ -72,6 +78,7 @@ const createStudent = async (req, res, next) => {
         const student = await db_1.default.student.create({
             data: validation.data,
         });
+        (0, activityLog_1.logActivity)({ req, action: 'CREATE_STUDENT', entity: 'Student', entityId: student.id, description: `Menambahkan siswa baru: ${student.name} (NIS: ${student.nis})` });
         return res.status(201).json({
             message: 'Student created successfully',
             student,
@@ -114,6 +121,7 @@ const updateStudent = async (req, res, next) => {
             where: { id },
             data: validation.data,
         });
+        (0, activityLog_1.logActivity)({ req, action: 'UPDATE_STUDENT', entity: 'Student', entityId: id, description: `Memperbarui data siswa: ${student.name} (NIS: ${student.nis})` });
         return res.status(200).json({
             message: 'Student updated successfully',
             student: updatedStudent,
@@ -135,6 +143,7 @@ const deleteStudent = async (req, res, next) => {
         await db_1.default.student.delete({
             where: { id },
         });
+        (0, activityLog_1.logActivity)({ req, action: 'DELETE_STUDENT', entity: 'Student', entityId: id, description: `Menghapus data siswa: ${student.name} (NIS: ${student.nis})` });
         return res.status(200).json({ message: 'Student deleted successfully' });
     }
     catch (error) {
@@ -373,6 +382,7 @@ const importStudents = async (req, res, next) => {
         if (dbErrors.length > 0) {
             return res.status(400).json({ message: 'Import failed due to duplicate database entries', errors: dbErrors });
         }
+        (0, activityLog_1.logActivity)({ req, action: 'IMPORT_STUDENTS', entity: 'Student', description: `Mengimpor ${successCount} data siswa dari Excel` });
         return res.status(200).json({
             message: `Successfully imported ${successCount} students.`,
         });
@@ -385,3 +395,229 @@ const importStudents = async (req, res, next) => {
     }
 };
 exports.importStudents = importStudents;
+// Update graduation status
+const updateGraduationStatus = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { isGraduated, graduationDate, certificateNumber } = req.body;
+        const student = await db_1.default.student.findUnique({ where: { id } });
+        if (!student) {
+            return res.status(404).json({ message: 'Student not found' });
+        }
+        if (certificateNumber && certificateNumber !== student.certificateNumber) {
+            const existing = await db_1.default.student.findUnique({ where: { certificateNumber } });
+            if (existing) {
+                return res.status(400).json({ message: 'Nomor seri ijazah sudah digunakan oleh siswa lain.' });
+            }
+        }
+        const updated = await db_1.default.student.update({
+            where: { id },
+            data: {
+                isGraduated,
+                graduationDate: graduationDate ? new Date(graduationDate) : null,
+                certificateNumber: certificateNumber || null,
+            },
+        });
+        (0, activityLog_1.logActivity)({ req, action: 'UPDATE_GRADUATION', entity: 'Student', entityId: id, description: `Memperbarui status kelulusan ${student.name}: ${isGraduated ? 'Lulus' : 'Tidak Lulus'}` });
+        return res.status(200).json({ message: 'Status kelulusan diperbarui', student: updated });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.updateGraduationStatus = updateGraduationStatus;
+// Batch update graduation status
+const batchUpdateGraduation = async (req, res, next) => {
+    try {
+        const { studentIds, isGraduated, graduationDate } = req.body;
+        if (!Array.isArray(studentIds) || studentIds.length === 0) {
+            return res.status(400).json({ message: 'Daftar ID siswa tidak valid.' });
+        }
+        await db_1.default.student.updateMany({
+            where: { id: { in: studentIds } },
+            data: {
+                isGraduated,
+                graduationDate: graduationDate ? new Date(graduationDate) : null,
+            },
+        });
+        (0, activityLog_1.logActivity)({ req, action: 'BATCH_UPDATE_GRADUATION', entity: 'Student', description: `Batch update kelulusan ${studentIds.length} siswa menjadi: ${isGraduated ? 'Lulus' : 'Tidak Lulus'}` });
+        return res.status(200).json({ message: `${studentIds.length} siswa berhasil diperbarui status kelulusannya.` });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.batchUpdateGraduation = batchUpdateGraduation;
+// Batch assign SKL numbers to all graduated students
+const batchAssignSklNumbers = async (req, res, next) => {
+    try {
+        const { format, overwrite } = req.body;
+        // format: e.g. "B.{seq}/MI.BH/{year}" — if not provided, use school profile format
+        // overwrite: boolean — if true, reassign even if student already has a sklNumber
+        // Get school profile for default format
+        const profile = await db_1.default.schoolProfile.findFirst();
+        const numberFormat = format || profile?.sklNumberFormat || 'B.{seq}/MI.BH/{year}';
+        // Fetch all graduated students ordered by name
+        const students = await db_1.default.student.findMany({
+            where: { isGraduated: true },
+            orderBy: { name: 'asc' },
+        });
+        if (students.length === 0) {
+            return res.status(400).json({ message: 'Tidak ada siswa yang berstatus lulus.' });
+        }
+        // Filter students that need SKL number
+        const toAssign = overwrite
+            ? students
+            : students.filter(s => !s.sklNumber);
+        if (toAssign.length === 0) {
+            return res.status(200).json({
+                message: 'Semua siswa lulus sudah memiliki nomor SKL. Gunakan opsi "Timpa" untuk meng-assign ulang.',
+                assigned: 0,
+            });
+        }
+        // Generate numbers sequentially
+        // Find the starting sequence — skip students that already have numbers
+        // so existing students get lower numbers than new ones
+        let seqCounter = 1;
+        const updates = [];
+        for (const student of toAssign) {
+            const year = student.graduationDate
+                ? new Date(student.graduationDate).getFullYear()
+                : new Date().getFullYear();
+            const seq = String(seqCounter).padStart(3, '0');
+            const sklNumber = numberFormat
+                .replace('{seq}', seq)
+                .replace('{year}', String(year));
+            updates.push({ id: student.id, sklNumber });
+            seqCounter++;
+        }
+        // Apply in transaction
+        await db_1.default.$transaction(updates.map(u => db_1.default.student.update({
+            where: { id: u.id },
+            data: { sklNumber: u.sklNumber },
+        })));
+        (0, activityLog_1.logActivity)({ req, action: 'ASSIGN_SKL_NUMBERS', entity: 'Student', description: `Meng-assign ${updates.length} nomor SKL dengan format: ${numberFormat}`, metadata: { assigned: updates.length, format: numberFormat } });
+        return res.status(200).json({
+            message: `Berhasil meng-assign ${updates.length} nomor SKL.`,
+            assigned: updates.length,
+            format: numberFormat,
+            preview: updates.slice(0, 3).map(u => u.sklNumber),
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.batchAssignSklNumbers = batchAssignSklNumbers;
+// Upload photos via ZIP
+const uploadPhotos = async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'Tidak ada file ZIP yang diunggah.' });
+        }
+        if (req.file.mimetype !== 'application/zip' && req.file.mimetype !== 'application/x-zip-compressed' && !req.file.originalname.endsWith('.zip')) {
+            fs_1.default.unlinkSync(req.file.path);
+            return res.status(400).json({ message: 'File harus berformat .zip' });
+        }
+        const zipFilePath = req.file.path;
+        const extractDir = path_1.default.join(process.cwd(), 'public', 'uploads', 'photos');
+        // Ensure photos directory exists
+        if (!fs_1.default.existsSync(extractDir)) {
+            fs_1.default.mkdirSync(extractDir, { recursive: true });
+        }
+        const zip = new adm_zip_1.default(zipFilePath);
+        const zipEntries = zip.getEntries();
+        let successCount = 0;
+        const errors = [];
+        // Valid image extensions
+        const validExts = ['.jpg', '.jpeg', '.png'];
+        for (const zipEntry of zipEntries) {
+            if (zipEntry.isDirectory)
+                continue;
+            const fileName = zipEntry.entryName;
+            // Skip hidden files or macOS __MACOSX folders
+            if (fileName.startsWith('__MACOSX') || fileName.includes('/._') || fileName.split('/').pop()?.startsWith('.'))
+                continue;
+            const ext = path_1.default.extname(fileName).toLowerCase();
+            if (!validExts.includes(ext))
+                continue;
+            // Extract the filename without extension (this should be the NISN)
+            const baseName = path_1.default.basename(fileName, ext);
+            const nisn = baseName.trim();
+            if (!nisn)
+                continue;
+            // Check if student with this NISN exists
+            const student = await db_1.default.student.findUnique({ where: { nisn } });
+            if (!student) {
+                errors.push(`NISN ${nisn} tidak ditemukan di database (${fileName}).`);
+                continue;
+            }
+            // Save the photo as {studentId}{ext}
+            const newFileName = `${student.id}${ext}`;
+            const destPath = path_1.default.join(extractDir, newFileName);
+            // Extract entry to buffer and save
+            const fileData = zipEntry.getData();
+            fs_1.default.writeFileSync(destPath, fileData);
+            // Update student photoUrl in DB
+            const photoUrl = `/uploads/photos/${newFileName}`;
+            await db_1.default.student.update({
+                where: { id: student.id },
+                data: { photoUrl },
+            });
+            successCount++;
+        }
+        // Delete uploaded ZIP
+        fs_1.default.unlinkSync(zipFilePath);
+        return res.status(200).json({
+            message: `Berhasil memproses ${successCount} foto.`,
+            successCount,
+            errors: errors.length > 0 ? errors : undefined,
+        });
+    }
+    catch (error) {
+        if (req.file && fs_1.default.existsSync(req.file.path)) {
+            fs_1.default.unlinkSync(req.file.path);
+        }
+        next(error);
+    }
+};
+exports.uploadPhotos = uploadPhotos;
+// Archive graduated students to Alumni
+const archiveStudents = async (req, res, next) => {
+    try {
+        // Cari siswa yang sudah lulus tapi belum jadi alumni
+        const graduatedStudents = await db_1.default.student.findMany({
+            where: {
+                isGraduated: true,
+                isAlumni: false,
+            },
+        });
+        if (graduatedStudents.length === 0) {
+            return res.status(400).json({ message: 'Tidak ada siswa lulus yang bisa diarsipkan.' });
+        }
+        // Dapatkan tahun ajaran aktif untuk label alumni
+        const activeYearRecord = await db_1.default.academicYear.findFirst({
+            where: { isActive: true },
+        });
+        const alumniYearStr = activeYearRecord ? activeYearRecord.year : new Date().getFullYear().toString();
+        // Lakukan pemindahan secara massal
+        const result = await db_1.default.student.updateMany({
+            where: {
+                isGraduated: true,
+                isAlumni: false,
+            },
+            data: {
+                isAlumni: true,
+                alumniYear: alumniYearStr,
+            },
+        });
+        return res.status(200).json({
+            message: `Berhasil mengarsipkan ${result.count} siswa ke Data Alumni.`,
+            archivedCount: result.count,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.archiveStudents = archiveStudents;

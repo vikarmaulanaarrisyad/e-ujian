@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.upload = void 0;
+exports.uploadImage = exports.uploadJson = exports.upload = void 0;
 const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
@@ -33,5 +33,36 @@ const fileFilter = (req, file, cb) => {
 exports.upload = (0, multer_1.default)({
     storage,
     fileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+});
+// ── JSON uploader for database backup restore ──
+const jsonFileFilter = (req, file, cb) => {
+    const ext = path_1.default.extname(file.originalname).toLowerCase();
+    if (ext === '.json') {
+        cb(null, true);
+    }
+    else {
+        cb(new Error('Only JSON backup files (.json) are allowed'), false);
+    }
+};
+exports.uploadJson = (0, multer_1.default)({
+    storage,
+    fileFilter: jsonFileFilter,
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for backups
+});
+// ── Image uploader for school logos ──
+const imageFileFilter = (req, file, cb) => {
+    const allowedExtensions = ['.png', '.jpg', '.jpeg'];
+    const ext = path_1.default.extname(file.originalname).toLowerCase();
+    if (allowedExtensions.includes(ext)) {
+        cb(null, true);
+    }
+    else {
+        cb(new Error('Only image files (.png, .jpg, .jpeg) are allowed'), false);
+    }
+};
+exports.uploadImage = (0, multer_1.default)({
+    storage,
+    fileFilter: imageFileFilter,
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
