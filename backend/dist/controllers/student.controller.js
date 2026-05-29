@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.archiveStudents = exports.uploadPhotos = exports.batchAssignSklNumbers = exports.batchUpdateGraduation = exports.updateGraduationStatus = exports.importStudents = exports.exportStudents = exports.getStudentTemplate = exports.deleteStudent = exports.updateStudent = exports.createStudent = exports.getStudentById = exports.getAllStudents = void 0;
+exports.archiveStudents = exports.uploadPhotos = exports.batchAssignSknrNumbers = exports.batchAssignSklNumbers = exports.batchUpdateGraduation = exports.updateGraduationStatus = exports.importStudents = exports.exportStudents = exports.getStudentTemplate = exports.deleteStudent = exports.updateStudent = exports.createStudent = exports.getStudentById = exports.getAllStudents = void 0;
 const exceljs_1 = __importDefault(require("exceljs"));
 const db_1 = __importDefault(require("../db"));
 const student_validator_1 = require("../validators/student.validator");
@@ -70,7 +70,9 @@ const createStudent = async (req, res, next) => {
                 errors: validation.error.flatten().fieldErrors,
             });
         }
-        const { nis, nisn } = validation.data;
+        let { nis, nisn } = validation.data;
+        nis = nis.padStart(10, '0');
+        nisn = nisn.padStart(10, '0');
         const existingNis = await db_1.default.student.findFirst({ where: { nis, tenantId } });
         if (existingNis) {
             return res.status(400).json({ message: 'NIS already registered' });
@@ -80,7 +82,7 @@ const createStudent = async (req, res, next) => {
             return res.status(400).json({ message: 'NISN already registered' });
         }
         const student = await db_1.default.student.create({
-            data: { ...validation.data, tenantId },
+            data: { ...validation.data, nis, nisn, tenantId },
         });
         (0, activityLog_1.logActivity)({ req, action: 'CREATE_STUDENT', entity: 'Student', entityId: student.id, description: `Menambahkan siswa baru: ${student.name} (NIS: ${student.nis})` });
         return res.status(201).json({
@@ -109,7 +111,11 @@ const updateStudent = async (req, res, next) => {
         if (!student) {
             return res.status(404).json({ message: 'Student not found' });
         }
-        const { nis, nisn } = validation.data;
+        let { nis, nisn } = validation.data;
+        if (nis)
+            nis = nis.padStart(10, '0');
+        if (nisn)
+            nisn = nisn.padStart(10, '0');
         if (nis && nis !== student.nis) {
             const existingNis = await db_1.default.student.findFirst({ where: { nis, tenantId } });
             if (existingNis) {
@@ -124,7 +130,7 @@ const updateStudent = async (req, res, next) => {
         }
         const updatedStudent = await db_1.default.student.update({
             where: { id, tenantId },
-            data: { ...validation.data, tenantId },
+            data: { ...validation.data, ...(nis && { nis }), ...(nisn && { nisn }), tenantId },
         });
         (0, activityLog_1.logActivity)({ req, action: 'UPDATE_STUDENT', entity: 'Student', entityId: id, description: `Memperbarui data siswa: ${student.name} (NIS: ${student.nis})` });
         return res.status(200).json({
@@ -327,8 +333,8 @@ const importStudents = async (req, res, next) => {
         worksheet.eachRow((row, rowNumber) => {
             if (rowNumber === 1)
                 return; // Skip header
-            const nis = getCellValueAsString(row.getCell(1));
-            const nisn = getCellValueAsString(row.getCell(2));
+            let nis = getCellValueAsString(row.getCell(1));
+            let nisn = getCellValueAsString(row.getCell(2));
             const name = getCellValueAsString(row.getCell(3));
             const genderRaw = getCellValueAsString(row.getCell(4)).toUpperCase();
             const placeOfBirth = getCellValueAsString(row.getCell(5));
@@ -336,6 +342,10 @@ const importStudents = async (req, res, next) => {
             const parentName = getCellValueAsString(row.getCell(7));
             if (!nis && !nisn && !name)
                 return; // Skip empty row
+            if (nis)
+                nis = nis.padStart(10, '0');
+            if (nisn)
+                nisn = nisn.padStart(10, '0');
             if (!nis || !nisn || !name || !genderRaw) {
                 errors.push(`Row ${rowNumber}: Mandatory fields (NIS, NISN, Nama, Gender) are missing.`);
                 return;
@@ -522,6 +532,66 @@ const batchAssignSklNumbers = async (req, res, next) => {
     }
 };
 exports.batchAssignSklNumbers = batchAssignSklNumbers;
+// Batch assign SKNR numbers to all graduated students
+const batchAssignSknrNumbers = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const { format, overwrite } = req.body;
+        const profile = await db_1.default.schoolProfile.findUnique({ where: { tenantId } });
+        const numberFormat = format || profile?.sknrNumberFormat || 'B.{seq}/SKNR/MI.BH/{year}';
+        const students = await db_1.default.student.findMany({
+            where: { isGraduated: true, tenantId },
+            orderBy: { name: 'asc' },
+        });
+        if (students.length === 0) {
+            return res.status(400).json({ message: 'Tidak ada siswa yang berstatus lulus.' });
+        }
+        const toAssign = overwrite
+            ? students
+            : students.filter(s => !s.sknrNumber);
+        if (toAssign.length === 0) {
+            return res.status(200).json({
+                message: 'Semua siswa lulus sudah memiliki nomor SKNR. Gunakan opsi "Timpa" untuk meng-assign ulang.',
+                assigned: 0,
+            });
+        }
+        let seqCounter = 1;
+        const updates = [];
+        for (const student of toAssign) {
+            const year = student.graduationDate
+                ? new Date(student.graduationDate).getFullYear()
+                : new Date().getFullYear();
+            const seq = String(seqCounter).padStart(3, '0');
+            const sknrNumber = numberFormat
+                .replace('{seq}', seq)
+                .replace('{year}', String(year));
+            updates.push({ id: student.id, sknrNumber });
+            seqCounter++;
+        }
+        await db_1.default.$transaction(updates.map(u => db_1.default.student.update({
+            where: { id: u.id },
+            data: { sknrNumber: u.sknrNumber },
+        })));
+        (0, activityLog_1.logActivity)({ req, action: 'ASSIGN_SKNR_NUMBERS', entity: 'Student', description: `Meng-assign ${updates.length} nomor SKNR dengan format: ${numberFormat}`, metadata: { assigned: updates.length, format: numberFormat } });
+        // Update School Profile format default if not present
+        if (!profile?.sknrNumberFormat) {
+            await db_1.default.schoolProfile.update({
+                where: { tenantId },
+                data: { sknrNumberFormat: numberFormat }
+            });
+        }
+        return res.status(200).json({
+            message: `Berhasil meng-assign ${updates.length} nomor SKNR.`,
+            assigned: updates.length,
+            format: numberFormat,
+            preview: updates.slice(0, 3).map(u => u.sknrNumber),
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.batchAssignSknrNumbers = batchAssignSknrNumbers;
 // Upload photos via ZIP
 const uploadPhotos = async (req, res, next) => {
     try {
@@ -534,7 +604,7 @@ const uploadPhotos = async (req, res, next) => {
             return res.status(400).json({ message: 'File harus berformat .zip' });
         }
         const zipFilePath = req.file.path;
-        const extractDir = path_1.default.join(process.cwd(), 'public', 'uploads', 'photos');
+        const extractDir = path_1.default.join(process.cwd(), 'uploads', 'photos');
         // Ensure photos directory exists
         if (!fs_1.default.existsSync(extractDir)) {
             fs_1.default.mkdirSync(extractDir, { recursive: true });
@@ -555,15 +625,27 @@ const uploadPhotos = async (req, res, next) => {
             const ext = path_1.default.extname(fileName).toLowerCase();
             if (!validExts.includes(ext))
                 continue;
-            // Extract the filename without extension (this should be the NISN)
+            // Extract the filename without extension (this should be the NIS or NISN)
             const baseName = path_1.default.basename(fileName, ext);
-            const nisn = baseName.trim();
-            if (!nisn)
+            const identifier = baseName.trim();
+            if (!identifier)
                 continue;
-            // Check if student with this NISN exists
-            const student = await db_1.default.student.findFirst({ where: { nisn, tenantId } });
+            // Try with padded value as well since we recently enforced 10 digits for NIS/NISN
+            const paddedIdentifier = identifier.padStart(10, '0');
+            // Check if student with this NISN or NIS exists
+            const student = await db_1.default.student.findFirst({
+                where: {
+                    tenantId,
+                    OR: [
+                        { nisn: identifier },
+                        { nisn: paddedIdentifier },
+                        { nis: identifier },
+                        { nis: paddedIdentifier }
+                    ]
+                }
+            });
             if (!student) {
-                errors.push(`NISN ${nisn} tidak ditemukan di database (${fileName}).`);
+                errors.push(`Siswa dengan NIS/NISN '${identifier}' tidak ditemukan di database (${fileName}).`);
                 continue;
             }
             // Save the photo as {studentId}{ext}

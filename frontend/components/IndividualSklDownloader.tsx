@@ -1,15 +1,15 @@
 import React, { useState, useRef } from 'react';
 import api from '@/lib/api';
-import { Loader2, FileText } from 'lucide-react';
+import { Loader2, FileText, FileSpreadsheet } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
 import jsPDF from 'jspdf';
 
-interface IndividualSklDownloaderProps {
+interface IndividualSklDownloaderProps { withTranscript?: boolean;
   studentId: string;
   className?: string;
 }
 
-export default function IndividualSklDownloader({ studentId, className }: IndividualSklDownloaderProps) {
+export default function IndividualSklDownloader({ studentId, withTranscript = false, className }: IndividualSklDownloaderProps) {
   const [downloading, setDownloading] = useState(false);
   const [docData, setDocData] = useState<any>(null);
   const printRef = useRef<HTMLDivElement>(null);
@@ -60,7 +60,7 @@ export default function IndividualSklDownloader({ studentId, className }: Indivi
       
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
       
-      const fileName = `SKL_${data.student.name.replace(/\s+/g, '_')}_${new Date().getFullYear()}.pdf`;
+      const fileName = `SKL_${withTranscript ? 'Nilai_' : ''}${data.student.name.replace(/\s+/g, '_')}_${new Date().getFullYear()}.pdf`;
       pdf.save(fileName);
       
     } catch (err) {
@@ -84,10 +84,10 @@ export default function IndividualSklDownloader({ studentId, className }: Indivi
       <button
         onClick={handleDownload}
         disabled={downloading}
-        title="Download PDF SKL"
+        title={withTranscript ? 'Download PDF SKL + Nilai' : 'Download PDF SKL'}
         className={className || "p-1.5 text-slate-450 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"}
       >
-        {downloading ? <Loader2 className="w-4 h-4 animate-spin text-emerald-400" /> : <FileText className="w-4 h-4" />}
+        {downloading ? <Loader2 className="w-4 h-4 animate-spin text-emerald-400" /> : (withTranscript ? <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> : <FileText className="w-4 h-4" />)}
       </button>
 
       {/* Hidden container for rendering SKL page */}
@@ -129,6 +129,13 @@ export default function IndividualSklDownloader({ studentId, className }: Indivi
               .identity-table .col-label { width: 220px; }
               .identity-table .col-sep { width: 16px; }
               .lulus-stamp-wrap { text-align: center; margin: 16px 0 14px; }
+              
+              .skl-nilai-table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 12px; font-family: "Times New Roman", Times, serif; }
+              .skl-nilai-table th, .skl-nilai-table td { border: 1.5px solid black; padding: 6px 8px; font-size: 14px; }
+              .skl-nilai-table th { text-align: center; font-weight: bold; }
+              .skl-nilai-table .col-no { width: 40px; text-align: center; }
+              .skl-nilai-table .col-mapel { text-align: left; }
+              .skl-nilai-table .col-nilai { width: 100px; text-align: center; font-weight: bold; }
               .lulus-stamp { display: inline-block; font-size: 28px; font-weight: 900; letter-spacing: 8px; border: 3px solid #000; padding: 10px 50px; border-radius: 6px; }
               .ttd-wrap { margin-top: auto; padding-top: 20px; display: flex; justify-content: flex-end; }
               .ttd-block { text-align: center; width: 250px; font-size: 15px; line-height: 1.6; }
@@ -149,7 +156,7 @@ export default function IndividualSklDownloader({ studentId, className }: Indivi
                       </td>
                       <td className="kop-text-td">
                         <div className="kop-text-inner">
-                          <span className="kop-line-yayasan">YAYASAN BUSTANUL HUDA DAWUHAN</span>
+                          <span className="kop-line-yayasan">{docData.schoolProfile?.foundationName?.toUpperCase() || docData.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN"}</span>
                           <span className="kop-line-sekolah">{docData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}</span>
                           <span className="kop-line-akreditasi">
                             TERAKREDITASI A NSM {docData.schoolProfile.nsm || '111233280040'} NPSN {docData.schoolProfile.npsn || '60713609'}
@@ -181,7 +188,6 @@ export default function IndividualSklDownloader({ studentId, className }: Indivi
                         ['Nama Lengkap',              <strong key="n" style={{ textTransform: 'uppercase' }}>{docData.student.name}</strong>],
                         ['Tempat, Tanggal Lahir',     `${docData.student.placeOfBirth || '-'}, ${formatDate(docData.student.dateOfBirth)}`],
                         ['Nama Orang Tua / Wali',     docData.student.parentName || '-'],
-                        ['Nomor Induk Siswa (NIS)',   docData.student.nis],
                         ['Nomor Induk Siswa Nasional (NISN)', docData.student.nisn],
                       ] as [string, React.ReactNode][]).map(([label, value], i) => (
                         <tr key={i}>
@@ -202,7 +208,41 @@ export default function IndividualSklDownloader({ studentId, className }: Indivi
                   <div className="lulus-stamp-wrap">
                     <span className="lulus-stamp">L U L U S</span>
                   </div>
-                  <p className="skl-para">
+                  {withTranscript && (
+                    <>
+                      <p className="skl-para" style={{ marginBottom: '6px' }}>
+                        dengan hasil Ujian Madrasah sebagai berikut:
+                      </p>
+                      <table className="skl-nilai-table">
+                        <thead>
+                          <tr>
+                            <th className="col-no">No</th>
+                            <th className="col-mapel">Mata Pelajaran</th>
+                            <th className="col-nilai">Nilai Ujian</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {docData.grades.filter((g: any) => g.examScore > 0).map((g: any, idx: number) => (
+                            <tr key={idx}>
+                              <td className="col-no">{idx + 1}</td>
+                              <td className="col-mapel">{g.subjectName}</td>
+                              <td className="col-nilai">{Number(g.examScore).toFixed(2).replace('.', ',')}</td>
+                            </tr>
+                          ))}
+                          <tr>
+                            <td colSpan={2} style={{ textAlign: 'right', fontWeight: 'bold', paddingRight: '12px' }}>RATA-RATA</td>
+                            <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{(() => {
+                                const valid = docData.grades.filter((g: any) => g.examScore > 0);
+                                const total = valid.reduce((acc: number, curr: any) => acc + Number(curr.examScore), 0);
+                                const avg = valid.length > 0 ? total / valid.length : 0;
+                                return Number(avg).toFixed(2).replace('.', ',');
+                              })()}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </>
+                  )}
+                  <p className="skl-para" style={withTranscript ? { marginTop: '8px' } : undefined}>
                     Surat Keterangan Lulus ini bersifat sementara dan dinyatakan berlaku sampai
                     dengan diterbitkannya Ijazah asli. Demikian Surat Keterangan Lulus ini dibuat
                     dengan sebenar-benarnya untuk dapat dipergunakan sebagaimana mestinya.

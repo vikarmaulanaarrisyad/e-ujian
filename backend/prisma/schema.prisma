@@ -93,6 +93,7 @@ model SchoolProfile {
   district        String?  // Kecamatan
   province        String?  // Provinsi
   logoUrl         String?  @map("logo_url")
+  foundationName  String?  @map("foundation_name") // Nama Yayasan (Kop)
   sklNumberFormat String?  @map("skl_number_format") // Format nomor SKL, e.g. "B.{seq}/MI.BH/{year}"
   sknrNumberFormat String? @map("sknr_number_format") // Format nomor SKNR
   createdAt       DateTime @default(now())

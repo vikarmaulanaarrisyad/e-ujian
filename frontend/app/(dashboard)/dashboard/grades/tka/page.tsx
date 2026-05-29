@@ -10,8 +10,12 @@ import {
   Upload, 
   Save, 
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  FileText,
+  Loader2
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function TkaGradesPage() {
   const { user } = useAuth();
@@ -22,6 +26,7 @@ export default function TkaGradesPage() {
   // Selected Subject Type State
   const [selectedSubjectType, setSelectedSubjectType] = useState<string>('MATEMATIKA');
   const [importing, setImporting] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -42,6 +47,15 @@ export default function TkaGradesPage() {
       return res.data;
     },
     enabled: !!selectedSubjectType,
+  });
+
+  // Fetch School Profile for PDF Kop Surat
+  const { data: schoolProfile } = useQuery({
+    queryKey: ['schoolProfile'],
+    queryFn: async () => {
+      const res = await api.get('/school');
+      return res.data;
+    },
   });
 
   // Sync server data to local grid state
@@ -141,6 +155,141 @@ export default function TkaGradesPage() {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!tkaData?.students || tkaData.students.length === 0) {
+      showToast('Tidak ada data siswa untuk diekspor.', 'error');
+      return;
+    }
+
+    setIsDownloadingPdf(true);
+
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pageWidth = doc.internal.pageSize.width;
+      const subjectName = selectedSubjectType === 'MATEMATIKA' ? 'Matematika' : 'Bahasa Indonesia';
+
+      // Load logo if available
+      let logoData = null;
+      if (schoolProfile?.logoUrl) {
+        try {
+          const img = new Image();
+          img.crossOrigin = 'Anonymous';
+          img.src = schoolProfile.logoUrl;
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0);
+          logoData = canvas.toDataURL('image/png');
+        } catch (e) {
+          console.error("Could not load logo for PDF", e);
+        }
+      }
+
+      // Draw KOP Surat
+      if (logoData) {
+        doc.addImage(logoData, 'PNG', 15, 10, 25, 25);
+      }
+      
+      doc.setFont('times', 'bold');
+      doc.setFontSize(14);
+      doc.text(data?.schoolProfile?.foundationName?.toUpperCase() || data?.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN", pageWidth / 2, 14, { align: 'center' });
+      
+      doc.setFontSize(18);
+      doc.text(schoolProfile?.name || 'MI BUSTANUL HUDA 01 DAWUHAN', pageWidth / 2, 21, { align: 'center' });
+      
+      doc.setFont('times', 'normal');
+      doc.setFontSize(10);
+      doc.text(`TERAKREDITASI A     NPSN : ${schoolProfile?.npsn || '60713609'}    NSM : ${schoolProfile?.nsm || "-"}`, pageWidth / 2, 27, { align: 'center' });
+      doc.text(schoolProfile?.address || '-', pageWidth / 2, 32, { align: 'center' });
+      
+      // KOP Double Line
+      doc.setLineWidth(1);
+      doc.line(15, 36, pageWidth - 15, 36);
+      doc.setLineWidth(0.5);
+      doc.line(15, 37.5, pageWidth - 15, 37.5);
+
+      // Title
+      doc.setFont('times', 'bold');
+      doc.setFontSize(14);
+      doc.text(`RANKING TKA - ${subjectName.toUpperCase()}`, pageWidth / 2, 48, { align: 'center' });
+
+      doc.setFont('times', 'normal');
+      doc.setFontSize(10);
+      doc.text(`Diunduh pada: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 54, { align: 'center' });
+
+      // Sort students by score (descending)
+      const sortedStudents = [...tkaData.students].sort((a, b) => {
+        const scoreA = a.score || 0;
+        const scoreB = b.score || 0;
+        return scoreB - scoreA;
+      });
+
+      const headers = ['Peringkat', 'NIS', 'Nama Lengkap', 'Nilai'];
+      
+      const body = sortedStudents.map((student: any, index: number) => [
+        index + 1,
+        student.nis,
+        student.studentName,
+        student.score !== null ? student.score : '-'
+      ]);
+
+      autoTable(doc, {
+        head: [headers],
+        body: body,
+        startY: 60,
+        theme: 'grid',
+        styles: { font: 'times', fontSize: 10, textColor: 0 },
+        headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold', halign: 'center' },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 25 },
+          1: { halign: 'center', cellWidth: 35 },
+          2: { halign: 'left' },
+          3: { halign: 'center', cellWidth: 30 },
+        },
+        margin: { left: 15, right: 15 },
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY + 15;
+      
+      // Check if we need a new page for signatures
+      if (finalY > doc.internal.pageSize.height - 40) {
+        doc.addPage();
+      }
+      
+      const signY = finalY > doc.internal.pageSize.height - 40 ? 30 : finalY;
+      
+      // Draw Signatures
+      doc.setFont('times', 'normal');
+      const cityName = schoolProfile?.city || 'Bondowoso';
+      doc.text(`${cityName}, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth - 20, signY, { align: 'right' });
+      doc.setFont('times', 'bold');
+      doc.text('Kepala Madrasah,', pageWidth - 45, signY + 6, { align: 'center' });
+      
+      doc.text(schoolProfile?.headmaster || '......................', pageWidth - 45, signY + 30, { align: 'center' });
+      doc.setFont('times', 'normal');
+      doc.text(`NIP. ${schoolProfile?.headmasterNip || '-'}`, pageWidth - 45, signY + 35, { align: 'center' });
+
+      const fileName = `Ranking_TKA_${selectedSubjectType}_${new Date().getFullYear()}.pdf`;
+      doc.save(fileName);
+      showToast('Ranking PDF berhasil diunduh.', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Gagal menggenerate PDF.', 'error');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedSubjectType) return;
@@ -177,6 +326,17 @@ export default function TkaGradesPage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
+          {selectedSubjectType && (
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isDownloadingPdf}
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-550 active:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all duration-200 shadow-md shadow-indigo-600/10 disabled:opacity-50"
+            >
+              {isDownloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              <span>{isDownloadingPdf ? 'Memproses PDF...' : 'Unduh Ranking PDF'}</span>
+            </button>
+          )}
+
           {selectedSubjectType && (
             <button
               onClick={handleExportExcel}

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.importAllExamGrades = exports.exportAllExamGrades = exports.importAllReportGrades = exports.exportAllReportGrades = exports.getSubjects = exports.getMissingGrades = exports.exportGradeRecap = exports.getGradeRecap = exports.importExamGrades = exports.exportExamGrades = exports.saveExamGrades = exports.getExamGrades = exports.importReportGrades = exports.exportReportGrades = exports.saveReportGrades = exports.getReportGrades = exports.updateGradeWeight = exports.getGradeWeight = void 0;
+exports.importAllExamGrades = exports.exportAllExamGrades = exports.importAllReportGrades = exports.exportAllReportGrades = exports.getSubjects = exports.getMissingGrades = exports.exportGradeSummary = exports.getGradeSummary = exports.exportGradeRecap = exports.getGradeRecap = exports.importExamGrades = exports.exportExamGrades = exports.saveExamGrades = exports.getExamGrades = exports.importReportGrades = exports.exportReportGrades = exports.saveReportGrades = exports.getReportGrades = exports.updateGradeWeight = exports.getGradeWeight = void 0;
 const exceljs_1 = __importDefault(require("exceljs"));
 const db_1 = __importDefault(require("../db"));
 const activityLog_1 = require("../lib/activityLog");
@@ -1130,6 +1130,233 @@ const exportGradeRecap = async (req, res, next) => {
     }
 };
 exports.exportGradeRecap = exportGradeRecap;
+// ==========================================
+// SUMMARY TKA AND UM
+// ==========================================
+const getGradeSummary = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const activeYear = await getActiveYear(tenantId);
+        if (!activeYear) {
+            return res.status(200).json({
+                academicYear: null,
+                summary: [],
+                schoolProfile: null,
+            });
+        }
+        let profile = await db_1.default.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } });
+        if (!profile) {
+            profile = { name: 'MI Bustanul Huda', city: 'Kota' };
+        }
+        if (profile.logoUrl && !profile.logoUrl.startsWith('http')) {
+            const host = req.get('host');
+            const protocol = req.protocol;
+            profile.logoUrl = `${protocol}://${host}${profile.logoUrl}`;
+        }
+        const students = await db_1.default.student.findMany({
+            where: { tenantId, isAlumni: false },
+            orderBy: { name: 'asc' },
+            include: {
+                tkaGrades: {
+                    where: { academicYearId: activeYear.id },
+                },
+                examGrades: {
+                    where: { academicYearId: activeYear.id },
+                },
+            },
+        });
+        const summary = students.map((student) => {
+            let tkaTotal = 0;
+            let tkaCount = 0;
+            student.tkaGrades.forEach(tka => {
+                tkaTotal += tka.score;
+                tkaCount++;
+            });
+            const tkaAverage = tkaCount > 0 ? tkaTotal / tkaCount : 0;
+            let examTotal = 0;
+            let examCount = 0;
+            student.examGrades.forEach(exam => {
+                examTotal += exam.score;
+                examCount++;
+            });
+            const examAverage = examCount > 0 ? examTotal / examCount : 0;
+            return {
+                studentId: student.id,
+                nis: student.nis,
+                nisn: student.nisn,
+                studentName: student.name,
+                gender: student.gender,
+                tkaAverage: Number(tkaAverage.toFixed(2)),
+                examAverage: Number(examAverage.toFixed(2)),
+                examAverageRounded: Math.round(examAverage),
+            };
+        });
+        summary.sort((a, b) => {
+            return a.studentName.localeCompare(b.studentName);
+        });
+        return res.status(200).json({
+            academicYear: {
+                id: activeYear.id,
+                year: activeYear.year,
+                semester: activeYear.semester,
+            },
+            summary: summary,
+            schoolProfile: profile,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.getGradeSummary = getGradeSummary;
+const exportGradeSummary = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const { ranking } = req.query;
+        const activeYear = await getActiveYear(tenantId);
+        if (!activeYear) {
+            return res.status(404).json({ message: 'No active academic year found' });
+        }
+        const students = await db_1.default.student.findMany({
+            where: { tenantId, isAlumni: false },
+            orderBy: { name: 'asc' },
+            include: {
+                tkaGrades: {
+                    where: { academicYearId: activeYear.id },
+                },
+                examGrades: {
+                    where: { academicYearId: activeYear.id },
+                },
+            },
+        });
+        const summaryRaw = students.map((student) => {
+            let tkaTotal = 0;
+            let tkaCount = 0;
+            student.tkaGrades.forEach(tka => {
+                tkaTotal += tka.score;
+                tkaCount++;
+            });
+            const tkaAverage = tkaCount > 0 ? tkaTotal / tkaCount : 0;
+            let examTotal = 0;
+            let examCount = 0;
+            student.examGrades.forEach(exam => {
+                examTotal += exam.score;
+                examCount++;
+            });
+            const examAverage = examCount > 0 ? examTotal / examCount : 0;
+            return {
+                nis: student.nis,
+                nisn: student.nisn,
+                studentName: student.name,
+                gender: student.gender,
+                tkaAverage,
+                examAverage,
+                examAverageRounded: Math.round(examAverage),
+            };
+        });
+        if (ranking === 'UM') {
+            summaryRaw.sort((a, b) => b.examAverage - a.examAverage);
+        }
+        else {
+            summaryRaw.sort((a, b) => {
+                return a.studentName.localeCompare(b.studentName);
+            });
+        }
+        const workbook = new exceljs_1.default.Workbook();
+        const sheetName = ranking === 'UM' ? 'Ranking UM' : 'Summary TKA & UM';
+        const worksheet = workbook.addWorksheet(sheetName);
+        worksheet.views = [
+            { state: 'frozen', xSplit: 3, ySplit: 1 }
+        ];
+        const columns = [
+            { key: 'nis', width: 15 },
+            { key: 'nisn', width: 15 },
+            { key: 'name', width: 30 },
+            { key: 'gender', width: 8 },
+            { key: 'tka', width: 15 },
+            { key: 'um', width: 15 },
+            { key: 'um_round', width: 15 },
+        ];
+        if (ranking === 'UM') {
+            columns.unshift({ key: 'rank', width: 10 });
+        }
+        worksheet.columns = columns;
+        const row1 = worksheet.getRow(1);
+        row1.height = 30;
+        let startColIdx = 1;
+        if (ranking === 'UM') {
+            row1.getCell(startColIdx++).value = 'Peringkat';
+        }
+        row1.getCell(startColIdx++).value = 'NIS';
+        row1.getCell(startColIdx++).value = 'NISN';
+        row1.getCell(startColIdx++).value = 'Nama Lengkap';
+        row1.getCell(startColIdx++).value = 'L/P';
+        row1.getCell(startColIdx++).value = 'Rata-rata TKA';
+        row1.getCell(startColIdx++).value = 'Rata-rata UM';
+        row1.getCell(startColIdx++).value = 'Rata-rata UM (Bulat)';
+        const headerBorder = {
+            top: { style: 'thin', color: { argb: 'A0A0A0' } },
+            left: { style: 'thin', color: { argb: 'A0A0A0' } },
+            bottom: { style: 'thin', color: { argb: 'A0A0A0' } },
+            right: { style: 'thin', color: { argb: 'A0A0A0' } }
+        };
+        const totalCols = ranking === 'UM' ? 8 : 7;
+        for (let c = 1; c <= totalCols; c++) {
+            const cell = row1.getCell(c);
+            cell.font = { bold: true, color: { argb: 'FFFFFF' }, name: 'Arial', size: 11 };
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: '0E7490' } // Cyan 700
+            };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = headerBorder;
+        }
+        const nameColIdx = ranking === 'UM' ? 4 : 3;
+        row1.getCell(nameColIdx).alignment = { horizontal: 'left', vertical: 'middle' };
+        summaryRaw.forEach((student, index) => {
+            const rowData = {
+                nis: student.nis,
+                nisn: student.nisn,
+                name: student.studentName,
+                gender: student.gender,
+                tka: student.tkaAverage !== 0 ? Number(student.tkaAverage.toFixed(2)) : '',
+                um: student.examAverage !== 0 ? Number(student.examAverage.toFixed(2)) : '',
+                um_round: student.examAverageRounded !== 0 ? student.examAverageRounded : '',
+            };
+            if (ranking === 'UM') {
+                rowData.rank = index + 1;
+            }
+            const newRow = worksheet.addRow(rowData);
+            newRow.height = 20;
+            newRow.eachCell((cell, colNumber) => {
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'D9D9D9' } },
+                    left: { style: 'thin', color: { argb: 'D9D9D9' } },
+                    bottom: { style: 'thin', color: { argb: 'D9D9D9' } },
+                    right: { style: 'thin', color: { argb: 'D9D9D9' } }
+                };
+                if (colNumber === nameColIdx) {
+                    cell.alignment = { vertical: 'middle' };
+                }
+                else {
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                }
+            });
+        });
+        const fileName = ranking === 'UM'
+            ? `ranking_um_${activeYear.year.replace('/', '_')}.xlsx`
+            : `summary_tka_um_${activeYear.year.replace('/', '_')}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        await workbook.xlsx.write(res);
+        res.end();
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.exportGradeSummary = exportGradeSummary;
 // Get list of all subjects
 const getMissingGrades = async (req, res, next) => {
     try {

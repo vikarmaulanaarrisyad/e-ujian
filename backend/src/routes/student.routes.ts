@@ -17,7 +17,7 @@ import {
 } from '../controllers/student.controller';
 import { authenticateJWT } from '../middlewares/auth.middleware';
 import { requireRoles } from '../middlewares/rbac.middleware';
-import { upload } from '../middlewares/upload.middleware';
+import { upload, uploadZip } from '../middlewares/upload.middleware';
 import { Role } from '../types/enums';
 
 const router = Router();
@@ -29,7 +29,7 @@ router.use(authenticateJWT);
 router.get('/template', requireRoles(Role.ADMIN, Role.STAFF), getStudentTemplate);
 router.get('/export', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), exportStudents);
 router.post('/import', requireRoles(Role.ADMIN, Role.STAFF), upload.single('file'), importStudents);
-router.post('/upload-photos', requireRoles(Role.ADMIN, Role.STAFF), upload.single('file'), uploadPhotos);
+router.post('/upload-photos', requireRoles(Role.ADMIN, Role.STAFF), uploadZip.single('file'), uploadPhotos);
 router.post('/archive', requireRoles(Role.ADMIN), archiveStudents);
 
 // Standard CRUD routes

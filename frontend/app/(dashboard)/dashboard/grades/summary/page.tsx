@@ -31,6 +31,7 @@ export default function GradeSummaryPage() {
   });
 
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloadingRankingUM, setIsDownloadingRankingUM] = useState(false);
 
   const handleDownloadPDF = async () => {
     if (!data?.summary || data.summary.length === 0) {
@@ -78,7 +79,7 @@ export default function GradeSummaryPage() {
       
       doc.setFont('times', 'bold');
       doc.setFontSize(14);
-      doc.text(data?.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN", pageWidth / 2, 14, { align: 'center' });
+      doc.text(data?.schoolProfile?.foundationName?.toUpperCase() || data?.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN", pageWidth / 2, 14, { align: 'center' });
       
       doc.setFontSize(18);
       doc.text(data?.schoolProfile?.name || 'MI BUSTANUL HUDA 01 DAWUHAN', pageWidth / 2, 21, { align: 'center' });
@@ -166,6 +167,142 @@ export default function GradeSummaryPage() {
     }
   };
 
+  const handleDownloadRankingUM_PDF = async () => {
+    if (!data?.summary || data.summary.length === 0) {
+      showToast('Tidak ada data untuk diunduh', 'error');
+      return;
+    }
+    
+    setIsDownloadingRankingUM(true);
+    
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+      
+      const pageWidth = doc.internal.pageSize.width;
+      
+      // Load logo if available
+      let logoData = null;
+      if (data?.schoolProfile?.logoUrl) {
+        try {
+          const img = new Image();
+          img.crossOrigin = 'Anonymous';
+          img.src = data.schoolProfile.logoUrl;
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0);
+          logoData = canvas.toDataURL('image/png');
+        } catch (e) {
+          console.error("Could not load logo for PDF", e);
+        }
+      }
+
+      // Draw KOP Surat
+      if (logoData) {
+        doc.addImage(logoData, 'PNG', 15, 10, 25, 25);
+      }
+      
+      doc.setFont('times', 'bold');
+      doc.setFontSize(14);
+      doc.text(data?.schoolProfile?.foundationName?.toUpperCase() || data?.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN", pageWidth / 2, 14, { align: 'center' });
+      
+      doc.setFontSize(18);
+      doc.text(data?.schoolProfile?.name || 'MI BUSTANUL HUDA 01 DAWUHAN', pageWidth / 2, 21, { align: 'center' });
+      
+      doc.setFont('times', 'normal');
+      doc.setFontSize(10);
+      doc.text(`TERAKREDITASI A     NPSN : ${data?.schoolProfile?.npsn || '60713609'}    NSM : ${data?.schoolProfile?.nsm || "-"}`, pageWidth / 2, 27, { align: 'center' });
+      doc.text(data?.schoolProfile?.address || '-', pageWidth / 2, 32, { align: 'center' });
+      
+      // KOP Double Line
+      doc.setLineWidth(1);
+      doc.line(15, 36, pageWidth - 15, 36);
+      doc.setLineWidth(0.5);
+      doc.line(15, 37.5, pageWidth - 15, 37.5);
+      
+      // Title
+      doc.setFont('times', 'bold');
+      doc.setFontSize(14);
+      doc.text('RANKING UJIAN MADRASAH', pageWidth / 2, 48, { align: 'center' });
+      
+      doc.setFont('times', 'normal');
+      doc.setFontSize(10);
+      doc.text(`Tahun Pelajaran: ${data?.academicYear?.year || '...'} | Semester: ${data?.academicYear?.semester === 'EVEN' ? 'GENAP' : 'GANJIL'}`, pageWidth / 2, 54, { align: 'center' });
+      
+      // Prepare Table Data
+      const headers = [
+        'Peringkat', 'NIS', 'Nama Lengkap', 'L/P',
+        'Rata-rata TKA', 'Rata-rata UM', 'Rata-rata UM (Bulat)'
+      ];
+      
+      const sortedSummary = [...data.summary].sort((a: StudentSummary, b: StudentSummary) => b.examAverage - a.examAverage);
+
+      const body = sortedSummary.map((student: StudentSummary, index: number) => [
+        index + 1,
+        student.nis,
+        student.studentName,
+        student.gender,
+        student.tkaAverage.toFixed(2),
+        student.examAverage.toFixed(2),
+        student.examAverageRounded
+      ]);
+
+      // Draw Table
+      autoTable(doc, {
+        head: [headers],
+        body: body,
+        startY: 60,
+        theme: 'grid',
+        styles: { font: 'times', fontSize: 9, textColor: 0, halign: 'center' },
+        headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold', halign: 'center' },
+        columnStyles: {
+          2: { halign: 'left', cellWidth: 50 }, // Nama Lengkap
+        },
+        margin: { left: 15, right: 15 },
+      });
+      
+      const finalY = (doc as any).lastAutoTable.finalY + 15;
+      
+      // Check if we need a new page for signatures
+      if (finalY > doc.internal.pageSize.height - 40) {
+        doc.addPage();
+      }
+      
+      const signY = finalY > doc.internal.pageSize.height - 40 ? 30 : finalY;
+      
+      // Draw Signatures
+      doc.setFont('times', 'normal');
+      const cityName = data?.schoolProfile?.city || 'Bondowoso';
+      doc.text(`${cityName}, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth - 20, signY, { align: 'right' });
+      doc.setFont('times', 'bold');
+      doc.text('Kepala Madrasah,', pageWidth - 45, signY + 6, { align: 'center' });
+      
+      doc.text(data?.schoolProfile?.headmaster || '......................', pageWidth - 45, signY + 30, { align: 'center' });
+      doc.setFont('times', 'normal');
+      doc.text(`NIP. ${data?.schoolProfile?.headmasterNip || '-'}`, pageWidth - 45, signY + 35, { align: 'center' });
+
+      // Save PDF
+      const fileName = `Ranking_UM_${data?.academicYear?.year ? data.academicYear.year.replace('/', '_') : 'summary'}.pdf`;
+      doc.save(fileName);
+      showToast('Ranking UM PDF berhasil diunduh.', 'success');
+      
+    } catch (err) {
+      console.error(err);
+      showToast('Terjadi kesalahan saat menggenerate PDF Ranking UM.', 'error');
+    } finally {
+      setIsDownloadingRankingUM(false);
+    }
+  };
+
   const handleExportExcel = async () => {
     try {
       const response = await api.get('/grades/summary/export', { responseType: 'blob' });
@@ -185,6 +322,25 @@ export default function GradeSummaryPage() {
     }
   };
 
+  const handleExportRankingUM_Excel = async () => {
+    try {
+      const response = await api.get('/grades/summary/export?ranking=UM', { responseType: 'blob' });
+      const fileName = `ranking_um_${data?.academicYear?.year ? data.academicYear.year.replace('/', '_') : 'summary'}.xlsx`;
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      showToast('Berhasil mengunduh Ranking UM ke Excel.', 'success');
+    } catch (err: any) {
+      console.error(err);
+      showToast('Gagal mengekspor Ranking UM.', 'error');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -196,22 +352,41 @@ export default function GradeSummaryPage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <button
-            onClick={handleExportExcel}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all duration-200 shadow-md shadow-emerald-600/10"
-          >
-            <Download className="w-4 h-4" />
-            <span>Unduh Excel</span>
-          </button>
+          <div className="flex gap-2 bg-slate-900/50 p-1.5 rounded-xl border border-slate-800">
+            <button
+              onClick={handleExportExcel}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg text-[11px] font-semibold flex items-center gap-2 cursor-pointer transition-all duration-200 shadow-md shadow-emerald-600/10"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Summary Excel</span>
+            </button>
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isDownloading}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-550 active:bg-indigo-700 text-white rounded-lg text-[11px] font-semibold flex items-center gap-2 cursor-pointer transition-all duration-200 shadow-md shadow-indigo-600/10 disabled:opacity-50"
+            >
+              {isDownloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+              <span>{isDownloading ? 'Memproses...' : 'Summary PDF'}</span>
+            </button>
+          </div>
 
-          <button
-            onClick={handleDownloadPDF}
-            disabled={isDownloading}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-550 active:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all duration-200 shadow-md shadow-indigo-600/10 disabled:opacity-50"
-          >
-            {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-            <span>{isDownloading ? 'Memproses PDF...' : 'Unduh PDF'}</span>
-          </button>
+          <div className="flex gap-2 bg-slate-900/50 p-1.5 rounded-xl border border-slate-800">
+            <button
+              onClick={handleExportRankingUM_Excel}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg text-[11px] font-semibold flex items-center gap-2 cursor-pointer transition-all duration-200 shadow-md shadow-emerald-600/10"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Ranking UM Excel</span>
+            </button>
+            <button
+              onClick={handleDownloadRankingUM_PDF}
+              disabled={isDownloadingRankingUM}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-550 active:bg-indigo-700 text-white rounded-lg text-[11px] font-semibold flex items-center gap-2 cursor-pointer transition-all duration-200 shadow-md shadow-indigo-600/10 disabled:opacity-50"
+            >
+              {isDownloadingRankingUM ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+              <span>{isDownloadingRankingUM ? 'Memproses...' : 'Ranking UM PDF'}</span>
+            </button>
+          </div>
         </div>
       </div>
 

@@ -302,6 +302,7 @@ export default function GraduationPage() {
                 <>
                   <IndividualSknrDownloader studentId={student.id} />
                   <IndividualSklDownloader studentId={student.id} />
+                  <IndividualSklDownloader studentId={student.id} withTranscript={true} />
                   <IndividualIjazahDownloader studentId={student.id} />
                 </>
               )}
@@ -422,6 +423,7 @@ export default function GraduationPage() {
 
               {/* Batch Print SKL (Direct Download) */}
               <BatchSklDownloader />
+              <BatchSklDownloader withTranscript={true} />
 
               {/* Batch Cancel Graduation */}
               <button

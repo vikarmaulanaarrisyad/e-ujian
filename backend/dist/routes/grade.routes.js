@@ -37,6 +37,9 @@ router.post('/tka/import', (0, rbac_middleware_1.requireRoles)(enums_1.Role.ADMI
 // Final calculated grade recap
 router.get('/recap', (0, rbac_middleware_1.requireRoles)(enums_1.Role.ADMIN, enums_1.Role.GURU, enums_1.Role.STAFF), grade_controller_1.getGradeRecap);
 router.get('/recap/export', (0, rbac_middleware_1.requireRoles)(enums_1.Role.ADMIN, enums_1.Role.GURU, enums_1.Role.STAFF), grade_controller_1.exportGradeRecap);
+// Summary TKA & UM grades
+router.get('/summary', (0, rbac_middleware_1.requireRoles)(enums_1.Role.ADMIN, enums_1.Role.GURU, enums_1.Role.STAFF), grade_controller_1.getGradeSummary);
+router.get('/summary/export', (0, rbac_middleware_1.requireRoles)(enums_1.Role.ADMIN, enums_1.Role.GURU, enums_1.Role.STAFF), grade_controller_1.exportGradeSummary);
 // Missing grades checker
 router.get('/missing', (0, rbac_middleware_1.requireRoles)(enums_1.Role.ADMIN, enums_1.Role.GURU, enums_1.Role.STAFF), grade_controller_1.getMissingGrades);
 exports.default = router;

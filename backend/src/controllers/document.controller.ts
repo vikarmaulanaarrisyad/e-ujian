@@ -123,10 +123,13 @@ export const getStudentDocumentData = async (req: Request, res: Response, next: 
 
     // Calculate total average
     let totalFinalScore = 0;
+    let totalExamScore = 0;
     if (grades.length > 0) {
       totalFinalScore = grades.reduce((acc, curr) => acc + curr.finalScore, 0);
+      totalExamScore = grades.reduce((acc, curr) => acc + curr.examScore, 0);
     }
     const averageFinalScore = grades.length > 0 ? Number((totalFinalScore / grades.length).toFixed(2)) : 0;
+    const averageExamScore = grades.length > 0 ? Number((totalExamScore / grades.length).toFixed(2)) : 0;
 
     return res.status(200).json({
       student: {
@@ -142,10 +145,12 @@ export const getStudentDocumentData = async (req: Request, res: Response, next: 
         graduationDate: student.graduationDate,
         certificateNumber: student.certificateNumber,
         sklNumber: student.sklNumber,
+        photoUrl: student.photoUrl,
       },
       schoolProfile: profile,
       grades,
       averageFinalScore,
+      averageExamScore,
       academicYear: activeYear.year,
     });
   } catch (error) {
@@ -174,6 +179,11 @@ export const getAllGraduatedSklData = async (req: Request, res: Response, next: 
     // Fetch all graduated students ordered by sklNumber then name
     const students = await prisma.student.findMany({
       where: { isGraduated: true, tenantId },
+      include: {
+        examGrades: {
+          where: { academicYearId: activeYear.id },
+        }
+      },
       orderBy: [{ sklNumber: 'asc' }, { name: 'asc' }],
     });
 
@@ -181,21 +191,49 @@ export const getAllGraduatedSklData = async (req: Request, res: Response, next: 
       return res.status(404).json({ message: 'Tidak ada siswa yang berstatus lulus.' });
     }
 
+    // Fetch all subjects to build the transcript table
+    const subjects = await prisma.subject.findMany({
+      where: { tenantId },
+      orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
+    });
+
     return res.status(200).json({
-      students: students.map((s) => ({
-        id: s.id,
-        nis: s.nis,
-        nisn: s.nisn,
-        name: s.name,
-        gender: s.gender,
-        placeOfBirth: s.placeOfBirth,
-        dateOfBirth: s.dateOfBirth,
-        parentName: s.parentName,
-        isGraduated: s.isGraduated,
-        graduationDate: s.graduationDate,
-        certificateNumber: s.certificateNumber,
-        sklNumber: s.sklNumber,
-      })),
+      students: students.map((s) => {
+        // Map exam scores for this student
+        const examGradesBySubject: Record<string, number> = {};
+        s.examGrades.forEach((eg) => {
+          examGradesBySubject[eg.subjectId] = eg.score;
+        });
+
+        const grades = subjects.map((subject) => ({
+          subjectId: subject.id,
+          subjectName: subject.name,
+          subjectGroup: subject.group,
+          examScore: Number((examGradesBySubject[subject.id] || 0).toFixed(2)),
+        }));
+
+        const validGrades = grades.filter(g => g.examScore > 0);
+        const totalExamScore = validGrades.reduce((acc, curr) => acc + curr.examScore, 0);
+        const averageExamScore = validGrades.length > 0 ? Number((totalExamScore / validGrades.length).toFixed(2)) : 0;
+
+        return {
+          id: s.id,
+          nis: s.nis,
+          nisn: s.nisn,
+          name: s.name,
+          gender: s.gender,
+          placeOfBirth: s.placeOfBirth,
+          dateOfBirth: s.dateOfBirth,
+          parentName: s.parentName,
+          isGraduated: s.isGraduated,
+          graduationDate: s.graduationDate,
+          certificateNumber: s.certificateNumber,
+          sklNumber: s.sklNumber,
+          photoUrl: s.photoUrl,
+          grades,
+          averageExamScore,
+        };
+      }),
       schoolProfile: profile,
       academicYear: activeYear.year,
     });
@@ -320,6 +358,7 @@ export const getStudentSknrData = async (req: Request, res: Response, next: Next
         certificateNumber: student.certificateNumber,
         sklNumber: student.sklNumber,
         sknrNumber: student.sknrNumber,
+        photoUrl: student.photoUrl,
       },
       schoolProfile: profile,
       sknrDetails: {

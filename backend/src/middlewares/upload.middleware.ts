@@ -66,3 +66,19 @@ export const uploadImage = multer({
   fileFilter: imageFileFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
+
+// ── Zip uploader for photo batches ──
+const zipFileFilter = (req: any, file: any, cb: any) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ext === '.zip') {
+    cb(null, true);
+  } else {
+    cb(new Error('Only ZIP files (.zip) are allowed'), false);
+  }
+};
+
+export const uploadZip = multer({
+  storage,
+  fileFilter: zipFileFilter,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit for bulk photos
+});

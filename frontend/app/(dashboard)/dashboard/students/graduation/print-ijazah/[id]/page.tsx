@@ -131,7 +131,7 @@ export default function PrintIjazahPage() {
               </td>
               <td className="kop-text-td">
                 <div className="kop-text-inner">
-                  <span className="kop-line-yayasan">YAYASAN BUSTANUL HUDA DAWUHAN</span>
+                  <span className="kop-line-yayasan">{schoolProfile?.foundationName?.toUpperCase() || schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN"}</span>
                   <span className="kop-line-sekolah">{schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}</span>
                   <span className="kop-line-akreditasi">
                     TERAKREDITASI A NSM {schoolProfile.nsm || '111233280040'} NPSN {schoolProfile.npsn || '60713609'}
@@ -217,7 +217,7 @@ export default function PrintIjazahPage() {
         </table>
 
         {/* Footer Signatures */}
-        <div className="flex justify-between mt-12 px-8">
+        <div className="flex justify-between mt-12 pr-8 pl-[160px]">
           <div className="w-48">
             {/* Photo slot */}
             {student.photoUrl ? (

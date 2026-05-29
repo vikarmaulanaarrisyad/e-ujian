@@ -298,6 +298,13 @@ export default function PrintSKLPage() {
           margin: 18px 0 16px;
         }
 
+        
+              .skl-nilai-table { width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 8px; font-family: "Times New Roman", Times, serif; }
+              .skl-nilai-table th, .skl-nilai-table td { border: 1.5px solid black; padding: 2px 6px; font-size: 13px; }
+              .skl-nilai-table th { text-align: center; font-weight: bold; }
+              .skl-nilai-table .col-no { width: 40px; text-align: center; }
+              .skl-nilai-table .col-mapel { text-align: left; }
+              .skl-nilai-table .col-nilai { width: 100px; text-align: center; font-weight: bold; }
         .lulus-stamp {
           display: inline-block;
           font-size: 26px;
@@ -391,7 +398,7 @@ export default function PrintSKLPage() {
 
               {/* Teks tengah */}
               <div className="kop-text">
-                <span className="kop-yayasan">{schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN"}</span>
+                <span className="kop-yayasan">{schoolProfile?.foundationName?.toUpperCase() || schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN"}</span>
                 <span className="kop-sekolah">{schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01'}</span>
                 <span className="kop-akreditasi">
                   Terakreditasi &ldquo;A&rdquo;&ensp;|&ensp;NPSN: {schoolProfile.npsn || '60713609'}&ensp;|&ensp;NSM: {schoolProfile?.nsm || "-"}
@@ -433,7 +440,6 @@ export default function PrintSKLPage() {
                     ['Nama Lengkap',              <strong style={{ textTransform: 'uppercase' }}>{student.name}</strong>],
                     ['Tempat, Tanggal Lahir',     `${student.placeOfBirth || '-'}, ${formatDate(student.dateOfBirth)}`],
                     ['Nama Orang Tua / Wali',     student.parentName || '-'],
-                    ['Nomor Induk Siswa (NIS)',   student.nis],
                     ['Nomor Induk Siswa Nasional (NISN)', student.nisn],
                   ].map(([label, value], i) => (
                     <tr key={i}>
@@ -456,9 +462,33 @@ export default function PrintSKLPage() {
               <div className="lulus-stamp-wrap">
                 <span className="lulus-stamp">L U L U S</span>
               </div>
-
-              <p className="skl-para">
-                Surat Keterangan Lulus ini bersifat sementara dan dinyatakan berlaku sampai
+        <p className="skl-para" style={{ marginBottom: '6px' }}>
+          dengan hasil Ujian Madrasah sebagai berikut:
+        </p>
+        <table className="skl-nilai-table">
+          <thead>
+            <tr>
+              <th className="col-no">No</th>
+              <th className="col-mapel">Mata Pelajaran</th>
+              <th className="col-nilai">Nilai Ujian</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.grades.map((g: any, idx: number) => (
+              <tr key={idx}>
+                <td className="col-no">{idx + 1}</td>
+                <td className="col-mapel">{g.subjectName}</td>
+                <td className="col-nilai">{Number(g.examScore).toFixed(2).replace('.', ',')}</td>
+              </tr>
+            ))}
+            <tr>
+              <td colSpan={2} style={{ textAlign: 'right', fontWeight: 'bold', paddingRight: '12px' }}>RATA-RATA</td>
+              <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{Number(data.averageExamScore).toFixed(2).replace('.', ',')}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="skl-para" style={{ marginTop: '8px' }}>
+          Surat Keterangan Lulus ini bersifat sementara dan dinyatakan berlaku sampai
                 dengan diterbitkannya Ijazah asli. Demikian Surat Keterangan Lulus ini dibuat
                 dengan sebenar-benarnya untuk dapat dipergunakan sebagaimana mestinya.
               </p>

@@ -39,7 +39,7 @@ const getSchoolProfile = async (req, res, next) => {
 exports.getSchoolProfile = getSchoolProfile;
 const updateSchoolProfile = async (req, res, next) => {
     try {
-        const { name, npsn, nsm, address, district, province, headmaster, headmasterNip, city, sklNumberFormat } = req.body;
+        const { name, foundationName, npsn, nsm, address, district, province, headmaster, headmasterNip, city, sklNumberFormat, sknrNumberFormat } = req.body;
         let profile = await db_1.default.schoolProfile.findFirst();
         let logoUrl = profile?.logoUrl;
         // If a new file is uploaded
@@ -57,10 +57,12 @@ const updateSchoolProfile = async (req, res, next) => {
                     district: district || profile.district,
                     province: province || profile.province,
                     city: city || profile.city,
+                    foundationName: foundationName !== undefined ? (foundationName || null) : profile.foundationName,
                     headmaster: headmaster || profile.headmaster,
                     headmasterNip: headmasterNip || profile.headmasterNip,
                     logoUrl,
                     sklNumberFormat: sklNumberFormat !== undefined ? (sklNumberFormat || null) : profile.sklNumberFormat,
+                    sknrNumberFormat: sknrNumberFormat !== undefined ? (sknrNumberFormat || null) : profile.sknrNumberFormat,
                 },
             });
         }
@@ -74,10 +76,12 @@ const updateSchoolProfile = async (req, res, next) => {
                     district: district || null,
                     province: province || null,
                     city: city || DEFAULT_SCHOOL.city,
+                    foundationName: foundationName || null,
                     headmaster: headmaster || DEFAULT_SCHOOL.headmaster,
                     headmasterNip: headmasterNip || DEFAULT_SCHOOL.headmasterNip,
                     logoUrl,
                     sklNumberFormat: sklNumberFormat || null,
+                    sknrNumberFormat: sknrNumberFormat || null,
                 },
             });
         }

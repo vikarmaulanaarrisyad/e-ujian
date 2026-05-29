@@ -125,7 +125,7 @@ export default function IndividualIjazahDownloader({ studentId, className }: Ind
               .ijazah-table th { text-align: center; font-weight: bold; }
               .ijazah-table .group-row { background: #f3f4f6; font-weight: bold; }
 
-              .footer-wrap { display: flex; justify-content: space-between; margin-top: 48px; padding: 0 32px; }
+              .footer-wrap { display: flex; justify-content: space-between; margin-top: 48px; padding-left: 160px; padding-right: 32px; }
               .photo-box { width: 3cm; height: 4cm; border: 2px solid black; display: flex; align-items: center; justify-content: center; font-size: 12px; text-align: center; padding: 8px; margin-bottom: 8px; }
               .photo-img { width: 3cm; height: 4cm; object-fit: cover; border: 2px solid black; margin-bottom: 8px; }
               .ttd-box { width: 250px; text-align: left; }
@@ -149,7 +149,7 @@ export default function IndividualIjazahDownloader({ studentId, className }: Ind
                       </td>
                       <td className="kop-text-td">
                         <div className="kop-text-inner">
-                          <span className="kop-line-yayasan">YAYASAN BUSTANUL HUDA DAWUHAN</span>
+                          <span className="kop-line-yayasan">{docData.schoolProfile?.foundationName?.toUpperCase() || docData.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN"}</span>
                           <span className="kop-line-sekolah">{docData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}</span>
                           <span className="kop-line-akreditasi">
                             TERAKREDITASI A NSM {docData.schoolProfile.nsm || '111233280040'} NPSN {docData.schoolProfile.npsn || '60713609'}
@@ -177,11 +177,6 @@ export default function IndividualIjazahDownloader({ studentId, className }: Ind
                       <td>Tempat dan Tanggal Lahir</td>
                       <td>:</td>
                       <td>{docData.student.placeOfBirth || '-'}, {formatDate(docData.student.dateOfBirth)}</td>
-                    </tr>
-                    <tr>
-                      <td>Nomor Induk Siswa</td>
-                      <td>:</td>
-                      <td>{docData.student.nis}</td>
                     </tr>
                     <tr>
                       <td>Nomor Induk Siswa Nasional</td>

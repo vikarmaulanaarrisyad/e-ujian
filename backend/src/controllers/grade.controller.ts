@@ -1394,6 +1394,7 @@ export const getGradeSummary = async (req: Request, res: Response, next: NextFun
 export const exportGradeSummary = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const { ranking } = req.query;
     
     const activeYear = await getActiveYear(tenantId);
     if (!activeYear) {
@@ -1441,18 +1442,23 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
       };
     });
 
-    summaryRaw.sort((a, b) => {
-      return a.studentName.localeCompare(b.studentName);
-    });
+    if (ranking === 'UM') {
+      summaryRaw.sort((a, b) => b.examAverage - a.examAverage);
+    } else {
+      summaryRaw.sort((a, b) => {
+        return a.studentName.localeCompare(b.studentName);
+      });
+    }
 
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Summary TKA & UM');
+    const sheetName = ranking === 'UM' ? 'Ranking UM' : 'Summary TKA & UM';
+    const worksheet = workbook.addWorksheet(sheetName);
 
     worksheet.views = [
       { state: 'frozen', xSplit: 3, ySplit: 1 }
     ];
 
-    worksheet.columns = [
+    const columns = [
       { key: 'nis', width: 15 },
       { key: 'nisn', width: 15 },
       { key: 'name', width: 30 },
@@ -1462,16 +1468,27 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
       { key: 'um_round', width: 15 },
     ];
 
+    if (ranking === 'UM') {
+      columns.unshift({ key: 'rank', width: 10 });
+    }
+
+    worksheet.columns = columns;
+
     const row1 = worksheet.getRow(1);
     row1.height = 30;
 
-    row1.getCell(1).value = 'NIS';
-    row1.getCell(2).value = 'NISN';
-    row1.getCell(3).value = 'Nama Lengkap';
-    row1.getCell(4).value = 'L/P';
-    row1.getCell(5).value = 'Rata-rata TKA';
-    row1.getCell(6).value = 'Rata-rata UM';
-    row1.getCell(7).value = 'Rata-rata UM (Bulat)';
+    let startColIdx = 1;
+    if (ranking === 'UM') {
+      row1.getCell(startColIdx++).value = 'Peringkat';
+    }
+
+    row1.getCell(startColIdx++).value = 'NIS';
+    row1.getCell(startColIdx++).value = 'NISN';
+    row1.getCell(startColIdx++).value = 'Nama Lengkap';
+    row1.getCell(startColIdx++).value = 'L/P';
+    row1.getCell(startColIdx++).value = 'Rata-rata TKA';
+    row1.getCell(startColIdx++).value = 'Rata-rata UM';
+    row1.getCell(startColIdx++).value = 'Rata-rata UM (Bulat)';
 
     const headerBorder: Partial<ExcelJS.Borders> = {
       top: { style: 'thin', color: { argb: 'A0A0A0' } },
@@ -1480,7 +1497,8 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
       right: { style: 'thin', color: { argb: 'A0A0A0' } }
     };
 
-    for (let c = 1; c <= 7; c++) {
+    const totalCols = ranking === 'UM' ? 8 : 7;
+    for (let c = 1; c <= totalCols; c++) {
       const cell = row1.getCell(c);
       cell.font = { bold: true, color: { argb: 'FFFFFF' }, name: 'Arial', size: 11 };
       cell.fill = {
@@ -1491,10 +1509,11 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
       cell.border = headerBorder;
     }
-    row1.getCell(3).alignment = { horizontal: 'left', vertical: 'middle' };
+    const nameColIdx = ranking === 'UM' ? 4 : 3;
+    row1.getCell(nameColIdx).alignment = { horizontal: 'left', vertical: 'middle' };
 
-    summaryRaw.forEach((student) => {
-      const newRow = worksheet.addRow({
+    summaryRaw.forEach((student, index) => {
+      const rowData: any = {
         nis: student.nis,
         nisn: student.nisn,
         name: student.studentName,
@@ -1502,7 +1521,13 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
         tka: student.tkaAverage !== 0 ? Number(student.tkaAverage.toFixed(2)) : '',
         um: student.examAverage !== 0 ? Number(student.examAverage.toFixed(2)) : '',
         um_round: student.examAverageRounded !== 0 ? student.examAverageRounded : '',
-      });
+      };
+      
+      if (ranking === 'UM') {
+        rowData.rank = index + 1;
+      }
+
+      const newRow = worksheet.addRow(rowData);
       newRow.height = 20;
 
       newRow.eachCell((cell, colNumber) => {
@@ -1513,7 +1538,7 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
           right: { style: 'thin', color: { argb: 'D9D9D9' } }
         };
 
-        if (colNumber === 3) {
+        if (colNumber === nameColIdx) {
           cell.alignment = { vertical: 'middle' };
         } else {
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -1521,7 +1546,9 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
       });
     });
 
-    const fileName = `summary_tka_um_${activeYear.year.replace('/', '_')}.xlsx`;
+    const fileName = ranking === 'UM' 
+      ? `ranking_um_${activeYear.year.replace('/', '_')}.xlsx`
+      : `summary_tka_um_${activeYear.year.replace('/', '_')}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
 

@@ -9,6 +9,7 @@ import Image from 'next/image';
 
 interface SchoolProfile {
   name: string;
+  foundationName: string;
   npsn: string;
   nsm: string;
   address: string;
@@ -28,6 +29,7 @@ export default function SchoolProfilePage() {
 
   const [profile, setProfile] = useState<SchoolProfile>({
     name: '',
+    foundationName: '',
     npsn: '',
     nsm: '',
     address: '',
@@ -53,6 +55,7 @@ export default function SchoolProfilePage() {
         const data = res.data;
         setProfile({
           name: data.name || '',
+          foundationName: data.foundationName || '',
           npsn: data.npsn || '',
           nsm: data.nsm || '',
           address: data.address || '',
@@ -97,6 +100,7 @@ export default function SchoolProfilePage() {
     try {
       const formData = new FormData();
       formData.append('name', profile.name);
+      formData.append('foundationName', profile.foundationName);
       formData.append('npsn', profile.npsn);
       formData.append('nsm', profile.nsm);
       formData.append('address', profile.address);
@@ -167,6 +171,18 @@ export default function SchoolProfilePage() {
             <div className="p-6 space-y-6">
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Judul Paling Atas (Kop Surat / Yayasan)</label>
+                  <input
+                    type="text"
+                    value={profile.foundationName}
+                    onChange={(e) => setProfile({ ...profile, foundationName: e.target.value })}
+                    disabled={!isAdmin}
+                    placeholder="Contoh: YAYASAN BUSTANUL HUDA DAWUHAN"
+                    className="block w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm font-semibold text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-50"
+                  />
+                </div>
+
                 <div className="md:col-span-2">
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Madrasah</label>
                   <input

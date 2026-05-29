@@ -279,7 +279,7 @@ export default function IndividualSknrDownloader({ studentId, className }: Indiv
                       </td>
                       <td className="kop-text-td">
                         <div className="kop-text-inner">
-                          <span className="kop-line-yayasan">YAYASAN BUSTANUL HUDA DAWUHAN</span>
+                          <span className="kop-line-yayasan">{docData.schoolProfile?.foundationName?.toUpperCase() || docData.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN"}</span>
                           <span className="kop-line-sekolah">{docData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}</span>
                           <span className="kop-line-akreditasi">
                             TERAKREDITASI A NSM {docData.schoolProfile.nsm || '111233280040'} NPSN {docData.schoolProfile.npsn || '60713609'}
@@ -342,9 +342,9 @@ export default function IndividualSknrDownloader({ studentId, className }: Indiv
                         <td>{docData.student.placeOfBirth || '-'}, {formatDate(docData.student.dateOfBirth)}</td>
                       </tr>
                       <tr>
-                        <td>NIS/NISN</td>
+                        <td>NISN</td>
                         <td>:</td>
-                        <td>{docData.student.nis} / {docData.student.nisn}</td>
+                        <td>{docData.student.nisn}</td>
                       </tr>
                     </tbody>
                   </table>

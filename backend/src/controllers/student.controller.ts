@@ -72,7 +72,9 @@ export const createStudent = async (req: Request, res: Response, next: NextFunct
       });
     }
 
-    const { nis, nisn } = validation.data;
+    let { nis, nisn } = validation.data;
+    nis = nis.padStart(10, '0');
+    nisn = nisn.padStart(10, '0');
 
     const existingNis = await prisma.student.findFirst({ where: { nis, tenantId } });
     if (existingNis) {
@@ -85,7 +87,7 @@ export const createStudent = async (req: Request, res: Response, next: NextFunct
     }
 
     const student = await (prisma.student.create as any)({
-      data: { ...validation.data, tenantId },
+      data: { ...validation.data, nis, nisn, tenantId },
     });
 
     logActivity({ req, action: 'CREATE_STUDENT', entity: 'Student', entityId: student.id, description: `Menambahkan siswa baru: ${student.name} (NIS: ${student.nis})` });
@@ -117,7 +119,9 @@ export const updateStudent = async (req: Request, res: Response, next: NextFunct
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    const { nis, nisn } = validation.data;
+    let { nis, nisn } = validation.data;
+    if (nis) nis = nis.padStart(10, '0');
+    if (nisn) nisn = nisn.padStart(10, '0');
 
     if (nis && nis !== student.nis) {
       const existingNis = await prisma.student.findFirst({ where: { nis, tenantId } });
@@ -135,7 +139,7 @@ export const updateStudent = async (req: Request, res: Response, next: NextFunct
 
     const updatedStudent = await (prisma.student.update as any)({
       where: { id, tenantId },
-      data: { ...validation.data, tenantId },
+      data: { ...validation.data, ...(nis && { nis }), ...(nisn && { nisn }), tenantId },
     });
 
     logActivity({ req, action: 'UPDATE_STUDENT', entity: 'Student', entityId: id, description: `Memperbarui data siswa: ${student.name} (NIS: ${student.nis})` });
@@ -373,8 +377,8 @@ export const importStudents = async (req: Request, res: Response, next: NextFunc
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return; // Skip header
 
-      const nis = getCellValueAsString(row.getCell(1));
-      const nisn = getCellValueAsString(row.getCell(2));
+      let nis = getCellValueAsString(row.getCell(1));
+      let nisn = getCellValueAsString(row.getCell(2));
       const name = getCellValueAsString(row.getCell(3));
       const genderRaw = getCellValueAsString(row.getCell(4)).toUpperCase();
       const placeOfBirth = getCellValueAsString(row.getCell(5));
@@ -382,6 +386,9 @@ export const importStudents = async (req: Request, res: Response, next: NextFunc
       const parentName = getCellValueAsString(row.getCell(7));
 
       if (!nis && !nisn && !name) return; // Skip empty row
+
+      if (nis) nis = nis.padStart(10, '0');
+      if (nisn) nisn = nisn.padStart(10, '0');
 
       if (!nis || !nisn || !name || !genderRaw) {
         errors.push(`Row ${rowNumber}: Mandatory fields (NIS, NISN, Nama, Gender) are missing.`);
@@ -689,7 +696,7 @@ export const uploadPhotos = async (req: Request, res: Response, next: NextFuncti
     }
 
     const zipFilePath = req.file.path;
-    const extractDir = path.join(process.cwd(), 'public', 'uploads', 'photos');
+    const extractDir = path.join(process.cwd(), 'uploads', 'photos');
     
     // Ensure photos directory exists
     if (!fs.existsSync(extractDir)) {
@@ -715,16 +722,30 @@ export const uploadPhotos = async (req: Request, res: Response, next: NextFuncti
       const ext = path.extname(fileName).toLowerCase();
       if (!validExts.includes(ext)) continue;
 
-      // Extract the filename without extension (this should be the NISN)
+      // Extract the filename without extension (this should be the NIS or NISN)
       const baseName = path.basename(fileName, ext);
-      const nisn = baseName.trim();
+      const identifier = baseName.trim();
 
-      if (!nisn) continue;
+      if (!identifier) continue;
 
-      // Check if student with this NISN exists
-      const student = await prisma.student.findFirst({ where: { nisn, tenantId } });
+      // Try with padded value as well since we recently enforced 10 digits for NIS/NISN
+      const paddedIdentifier = identifier.padStart(10, '0');
+
+      // Check if student with this NISN or NIS exists
+      const student = await prisma.student.findFirst({
+        where: {
+          tenantId,
+          OR: [
+            { nisn: identifier },
+            { nisn: paddedIdentifier },
+            { nis: identifier },
+            { nis: paddedIdentifier }
+          ]
+        }
+      });
+
       if (!student) {
-        errors.push(`NISN ${nisn} tidak ditemukan di database (${fileName}).`);
+        errors.push(`Siswa dengan NIS/NISN '${identifier}' tidak ditemukan di database (${fileName}).`);
         continue;
       }
 
