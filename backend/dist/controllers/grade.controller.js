@@ -10,9 +10,9 @@ const activityLog_1 = require("../lib/activityLog");
 const grade_validator_1 = require("../validators/grade.validator");
 const fs_1 = __importDefault(require("fs"));
 // Helper to get active academic year
-const getActiveYear = async () => {
+const getActiveYear = async (tenantId) => {
     return await db_1.default.academicYear.findFirst({
-        where: { isActive: true },
+        where: { tenantId, isActive: true },
         include: { gradeWeights: true },
     });
 };
@@ -44,7 +44,8 @@ const getCellValueAsString = (cell) => {
 // ==========================================
 const getGradeWeight = async (req, res, next) => {
     try {
-        const activeYear = await getActiveYear();
+        const tenantId = req.user.tenantId;
+        const activeYear = await getActiveYear(tenantId);
         if (!activeYear) {
             return res.status(404).json({ message: 'No active academic year found' });
         }
@@ -53,13 +54,14 @@ const getGradeWeight = async (req, res, next) => {
             // Create a default if not exists
             weight = await db_1.default.gradeWeight.create({
                 data: {
+                    tenantId,
                     reportPercentage: 60.0,
                     examPercentage: 40.0,
                     academicYearId: activeYear.id,
                 },
             });
         }
-        const profile = await db_1.default.schoolProfile.findFirst();
+        const profile = await db_1.default.schoolProfile.findUnique({ where: { tenantId } });
         return res.status(200).json({
             academicYear: {
                 id: activeYear.id,
@@ -77,6 +79,7 @@ const getGradeWeight = async (req, res, next) => {
 exports.getGradeWeight = getGradeWeight;
 const updateGradeWeight = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const validation = grade_validator_1.updateGradeWeightSchema.safeParse(req.body);
         if (!validation.success) {
             return res.status(400).json({
@@ -84,9 +87,13 @@ const updateGradeWeight = async (req, res, next) => {
                 errors: validation.error.flatten().fieldErrors,
             });
         }
-        const activeYear = await getActiveYear();
+        const activeYear = await getActiveYear(tenantId);
         if (!activeYear) {
-            return res.status(404).json({ message: 'No active academic year found' });
+            return res.status(200).json({
+                subject: null,
+                academicYearId: null,
+                students: [],
+            });
         }
         const { reportPercentage, examPercentage, activeSemesters } = validation.data;
         const activeSemestersString = activeSemesters ? activeSemesters.join(',') : "7,8,9,10,11";
@@ -100,6 +107,7 @@ const updateGradeWeight = async (req, res, next) => {
         else {
             weight = await db_1.default.gradeWeight.create({
                 data: {
+                    tenantId,
                     reportPercentage,
                     examPercentage,
                     activeSemesters: activeSemestersString,
@@ -122,11 +130,12 @@ exports.updateGradeWeight = updateGradeWeight;
 // ==========================================
 const getReportGrades = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { subjectId } = req.query;
         if (!subjectId) {
             return res.status(400).json({ message: 'Subject ID is required' });
         }
-        const activeYear = await getActiveYear();
+        const activeYear = await getActiveYear(tenantId);
         if (!activeYear) {
             return res.status(404).json({ message: 'No active academic year found' });
         }
@@ -138,6 +147,7 @@ const getReportGrades = async (req, res, next) => {
             return res.status(404).json({ message: 'Subject not found' });
         }
         const students = await db_1.default.student.findMany({
+            where: { tenantId },
             orderBy: { name: 'asc' },
             include: {
                 reportGrades: {
@@ -174,6 +184,7 @@ const getReportGrades = async (req, res, next) => {
 exports.getReportGrades = getReportGrades;
 const saveReportGrades = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const validation = grade_validator_1.saveReportGradesSchema.safeParse(req.body);
         if (!validation.success) {
             return res.status(400).json({
@@ -181,14 +192,15 @@ const saveReportGrades = async (req, res, next) => {
                 errors: validation.error.flatten().fieldErrors,
             });
         }
-        const activeYear = await getActiveYear();
+        const activeYear = await getActiveYear(tenantId);
         if (!activeYear) {
             return res.status(404).json({ message: 'No active academic year found' });
         }
         const { grades } = validation.data;
         await db_1.default.$transaction(grades.map((g) => db_1.default.reportGrade.upsert({
             where: {
-                studentId_subjectId_academicYearId_semester: {
+                tenantId_studentId_subjectId_academicYearId_semester: {
+                    tenantId,
                     studentId: g.studentId,
                     subjectId: g.subjectId,
                     academicYearId: activeYear.id,
@@ -197,6 +209,7 @@ const saveReportGrades = async (req, res, next) => {
             },
             update: { score: g.score },
             create: {
+                tenantId,
                 studentId: g.studentId,
                 subjectId: g.subjectId,
                 academicYearId: activeYear.id,
@@ -215,11 +228,12 @@ exports.saveReportGrades = saveReportGrades;
 // Export Report template or existing grades for a Subject
 const exportReportGrades = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { subjectId, semester } = req.query;
         if (!subjectId) {
             return res.status(400).json({ message: 'Subject ID is required' });
         }
-        const activeYear = await getActiveYear();
+        const activeYear = await getActiveYear(tenantId);
         if (!activeYear) {
             return res.status(404).json({ message: 'No active academic year found' });
         }
@@ -229,6 +243,7 @@ const exportReportGrades = async (req, res, next) => {
         }
         const targetSemester = semester ? parseInt(String(semester)) : null;
         const students = await db_1.default.student.findMany({
+            where: { tenantId },
             orderBy: { name: 'asc' },
             include: {
                 reportGrades: {
@@ -347,6 +362,7 @@ exports.exportReportGrades = exportReportGrades;
 // Import Report Grades for a Subject
 const importReportGrades = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { subjectId } = req.body;
         if (!subjectId) {
             if (req.file)
@@ -356,7 +372,7 @@ const importReportGrades = async (req, res, next) => {
         if (!req.file) {
             return res.status(400).json({ message: 'No Excel file uploaded' });
         }
-        const activeYear = await getActiveYear();
+        const activeYear = await getActiveYear(tenantId);
         if (!activeYear) {
             fs_1.default.unlinkSync(req.file.path);
             return res.status(404).json({ message: 'No active academic year found' });
@@ -425,13 +441,14 @@ const importReportGrades = async (req, res, next) => {
         const dbErrors = [];
         await db_1.default.$transaction(async (tx) => {
             for (const item of gradesToUpsert) {
-                const student = await tx.student.findUnique({ where: { nis: item.nis } });
+                const student = await tx.student.findFirst({ where: { nis: item.nis, tenantId } });
                 if (!student) {
                     throw new Error(`Student with NIS '${item.nis}' not found in the database.`);
                 }
                 await tx.reportGrade.upsert({
                     where: {
-                        studentId_subjectId_academicYearId_semester: {
+                        tenantId_studentId_subjectId_academicYearId_semester: {
+                            tenantId,
                             studentId: student.id,
                             subjectId: subject.id,
                             academicYearId: activeYear.id,
@@ -440,6 +457,7 @@ const importReportGrades = async (req, res, next) => {
                     },
                     update: { score: item.score },
                     create: {
+                        tenantId,
                         studentId: student.id,
                         subjectId: subject.id,
                         academicYearId: activeYear.id,
@@ -449,7 +467,7 @@ const importReportGrades = async (req, res, next) => {
                 });
                 savedCount++;
             }
-        }).catch((err) => {
+        }, { maxWait: 100000, timeout: 100000 }).catch((err) => {
             dbErrors.push(err.message);
         });
         fs_1.default.unlinkSync(req.file.path);
@@ -473,13 +491,18 @@ exports.importReportGrades = importReportGrades;
 // ==========================================
 const getExamGrades = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { subjectId } = req.query;
         if (!subjectId) {
             return res.status(400).json({ message: 'Subject ID is required' });
         }
-        const activeYear = await getActiveYear();
+        const activeYear = await getActiveYear(req.user.tenantId);
         if (!activeYear) {
-            return res.status(404).json({ message: 'No active academic year found' });
+            return res.status(200).json({
+                subject: null,
+                academicYearId: null,
+                students: [],
+            });
         }
         const subject = await db_1.default.subject.findUnique({
             where: { id: String(subjectId) },
@@ -488,6 +511,7 @@ const getExamGrades = async (req, res, next) => {
             return res.status(404).json({ message: 'Subject not found' });
         }
         const students = await db_1.default.student.findMany({
+            where: { tenantId },
             orderBy: { name: 'asc' },
             include: {
                 examGrades: {
@@ -521,6 +545,7 @@ const getExamGrades = async (req, res, next) => {
 exports.getExamGrades = getExamGrades;
 const saveExamGrades = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const validation = grade_validator_1.saveExamGradesSchema.safeParse(req.body);
         if (!validation.success) {
             return res.status(400).json({
@@ -528,14 +553,15 @@ const saveExamGrades = async (req, res, next) => {
                 errors: validation.error.flatten().fieldErrors,
             });
         }
-        const activeYear = await getActiveYear();
+        const activeYear = await getActiveYear(tenantId);
         if (!activeYear) {
             return res.status(404).json({ message: 'No active academic year found' });
         }
         const { grades } = validation.data;
         await db_1.default.$transaction(grades.map((g) => db_1.default.examGrade.upsert({
             where: {
-                studentId_subjectId_academicYearId: {
+                tenantId_studentId_subjectId_academicYearId: {
+                    tenantId,
                     studentId: g.studentId,
                     subjectId: g.subjectId,
                     academicYearId: activeYear.id,
@@ -543,6 +569,7 @@ const saveExamGrades = async (req, res, next) => {
             },
             update: { score: g.score },
             create: {
+                tenantId,
                 studentId: g.studentId,
                 subjectId: g.subjectId,
                 academicYearId: activeYear.id,
@@ -560,11 +587,12 @@ exports.saveExamGrades = saveExamGrades;
 // Export Exam template or existing grades for a Subject
 const exportExamGrades = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { subjectId } = req.query;
         if (!subjectId) {
             return res.status(400).json({ message: 'Subject ID is required' });
         }
-        const activeYear = await getActiveYear();
+        const activeYear = await getActiveYear(tenantId);
         if (!activeYear) {
             return res.status(404).json({ message: 'No active academic year found' });
         }
@@ -573,6 +601,7 @@ const exportExamGrades = async (req, res, next) => {
             return res.status(404).json({ message: 'Subject not found' });
         }
         const students = await db_1.default.student.findMany({
+            where: { tenantId },
             orderBy: { name: 'asc' },
             include: {
                 examGrades: {
@@ -665,6 +694,7 @@ exports.exportExamGrades = exportExamGrades;
 // Import Exam Grades for a Subject
 const importExamGrades = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { subjectId } = req.body;
         if (!subjectId) {
             if (req.file)
@@ -674,7 +704,7 @@ const importExamGrades = async (req, res, next) => {
         if (!req.file) {
             return res.status(400).json({ message: 'No Excel file uploaded' });
         }
-        const activeYear = await getActiveYear();
+        const activeYear = await getActiveYear(tenantId);
         if (!activeYear) {
             fs_1.default.unlinkSync(req.file.path);
             return res.status(404).json({ message: 'No active academic year found' });
@@ -722,13 +752,14 @@ const importExamGrades = async (req, res, next) => {
         const dbErrors = [];
         await db_1.default.$transaction(async (tx) => {
             for (const item of gradesToUpsert) {
-                const student = await tx.student.findUnique({ where: { nis: item.nis } });
+                const student = await tx.student.findFirst({ where: { nis: item.nis, tenantId } });
                 if (!student) {
                     throw new Error(`Student with NIS '${item.nis}' not found in the database.`);
                 }
                 await tx.examGrade.upsert({
                     where: {
-                        studentId_subjectId_academicYearId: {
+                        tenantId_studentId_subjectId_academicYearId: {
+                            tenantId,
                             studentId: student.id,
                             subjectId: subject.id,
                             academicYearId: activeYear.id,
@@ -736,6 +767,7 @@ const importExamGrades = async (req, res, next) => {
                     },
                     update: { score: item.score },
                     create: {
+                        tenantId,
                         studentId: student.id,
                         subjectId: subject.id,
                         academicYearId: activeYear.id,
@@ -744,7 +776,7 @@ const importExamGrades = async (req, res, next) => {
                 });
                 savedCount++;
             }
-        }).catch((err) => {
+        }, { maxWait: 100000, timeout: 100000 }).catch((err) => {
             dbErrors.push(err.message);
         });
         fs_1.default.unlinkSync(req.file.path);
@@ -769,15 +801,21 @@ exports.importExamGrades = importExamGrades;
 // ==========================================
 const getGradeRecap = async (req, res, next) => {
     try {
-        const activeYear = await getActiveYear();
+        const tenantId = req.user.tenantId;
+        const activeYear = await getActiveYear(req.user.tenantId);
         if (!activeYear) {
-            return res.status(404).json({ message: 'No active academic year found' });
+            return res.status(200).json({
+                academicYear: null,
+                weight: { reportPercentage: 60.0, examPercentage: 40.0 },
+                recap: [],
+                schoolProfile: null,
+            });
         }
         const weight = activeYear.gradeWeights[0] || { reportPercentage: 60.0, examPercentage: 40.0 };
         const rWeight = weight.reportPercentage / 100.0;
         const eWeight = weight.examPercentage / 100.0;
         // Fetch school profile
-        let profile = await db_1.default.schoolProfile.findFirst();
+        let profile = await db_1.default.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } });
         if (!profile) {
             profile = {
                 id: 'default',
@@ -799,6 +837,7 @@ const getGradeRecap = async (req, res, next) => {
         }
         // Fetch all students, report card grades, and exam grades
         const students = await db_1.default.student.findMany({
+            where: { tenantId },
             orderBy: { name: 'asc' },
             include: {
                 reportGrades: {
@@ -812,8 +851,7 @@ const getGradeRecap = async (req, res, next) => {
             },
         });
         // Fetch all subjects to make sure our list is complete
-        const subjects = await db_1.default.subject.findMany({
-            orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
+        const subjects = await db_1.default.subject.findMany({ where: { tenantId }, orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
         });
         const activeSemestersStr = weight.activeSemesters || "7,8,9,10,11";
         const activeSemesters = activeSemestersStr.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
@@ -905,7 +943,8 @@ const getGradeRecap = async (req, res, next) => {
 exports.getGradeRecap = getGradeRecap;
 const exportGradeRecap = async (req, res, next) => {
     try {
-        const activeYear = await getActiveYear();
+        const tenantId = req.user.tenantId;
+        const activeYear = await getActiveYear(req.user.tenantId);
         if (!activeYear) {
             return res.status(404).json({ message: 'No active academic year found' });
         }
@@ -913,6 +952,7 @@ const exportGradeRecap = async (req, res, next) => {
         const rWeight = weight.reportPercentage / 100.0;
         const eWeight = weight.examPercentage / 100.0;
         const students = await db_1.default.student.findMany({
+            where: { tenantId },
             orderBy: { name: 'asc' },
             include: {
                 reportGrades: {
@@ -925,8 +965,7 @@ const exportGradeRecap = async (req, res, next) => {
                 },
             },
         });
-        const subjects = await db_1.default.subject.findMany({
-            orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
+        const subjects = await db_1.default.subject.findMany({ where: { tenantId }, orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
         });
         const activeSemestersStr = weight.activeSemesters || "7,8,9,10,11";
         const activeSemesters = activeSemestersStr.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
@@ -1094,19 +1133,18 @@ exports.exportGradeRecap = exportGradeRecap;
 // Get list of all subjects
 const getMissingGrades = async (req, res, next) => {
     try {
-        const activeYear = await getActiveYear();
+        const tenantId = req.user.tenantId;
+        const activeYear = await getActiveYear(req.user.tenantId);
         if (!activeYear) {
             return res.status(404).json({ message: 'No active academic year found' });
         }
         const [students, subjects, existingReportGrades, existingExamGrades] = await Promise.all([
-            db_1.default.student.findMany({ where: { isAlumni: false }, orderBy: { name: 'asc' } }),
-            db_1.default.subject.findMany({ orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }] }),
-            db_1.default.reportGrade.findMany({
-                where: { academicYearId: activeYear.id },
+            db_1.default.student.findMany({ where: { isAlumni: false, tenantId }, orderBy: { name: 'asc' } }),
+            db_1.default.subject.findMany({ where: { tenantId }, orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }] }),
+            db_1.default.reportGrade.findMany({ where: { tenantId, academicYearId: activeYear.id },
                 select: { studentId: true, subjectId: true, semester: true },
             }),
-            db_1.default.examGrade.findMany({
-                where: { academicYearId: activeYear.id },
+            db_1.default.examGrade.findMany({ where: { tenantId, academicYearId: activeYear.id },
                 select: { studentId: true, subjectId: true },
             }),
         ]);
@@ -1185,8 +1223,8 @@ const getMissingGrades = async (req, res, next) => {
 exports.getMissingGrades = getMissingGrades;
 const getSubjects = async (req, res, next) => {
     try {
-        const subjects = await db_1.default.subject.findMany({
-            orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
+        const tenantId = req.user.tenantId;
+        const subjects = await db_1.default.subject.findMany({ where: { tenantId }, orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
         });
         return res.status(200).json(subjects);
     }
@@ -1198,13 +1236,13 @@ exports.getSubjects = getSubjects;
 // Export Report template or existing grades for ALL Subjects
 const exportAllReportGrades = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { semester } = req.query;
-        const activeYear = await getActiveYear();
+        const activeYear = await getActiveYear(req.user.tenantId);
         if (!activeYear) {
             return res.status(404).json({ message: 'No active academic year found' });
         }
-        const subjects = await db_1.default.subject.findMany({
-            orderBy: [
+        const subjects = await db_1.default.subject.findMany({ where: { tenantId }, orderBy: [
                 { group: 'asc' },
                 { order: 'asc' },
                 { name: 'asc' }
@@ -1212,6 +1250,7 @@ const exportAllReportGrades = async (req, res, next) => {
         });
         const targetSemester = semester ? parseInt(String(semester)) : null;
         const students = await db_1.default.student.findMany({
+            where: { tenantId },
             orderBy: { name: 'asc' },
             include: {
                 reportGrades: {
@@ -1413,10 +1452,11 @@ exports.exportAllReportGrades = exportAllReportGrades;
 // Import Report card grades for ALL Subjects
 const importAllReportGrades = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         if (!req.file) {
             return res.status(400).json({ message: 'No Excel file uploaded' });
         }
-        const activeYear = await getActiveYear();
+        const activeYear = await getActiveYear(tenantId);
         if (!activeYear) {
             fs_1.default.unlinkSync(req.file.path);
             return res.status(404).json({ message: 'No active academic year found' });
@@ -1428,7 +1468,7 @@ const importAllReportGrades = async (req, res, next) => {
             fs_1.default.unlinkSync(req.file.path);
             return res.status(400).json({ message: 'Worksheet not found' });
         }
-        const subjects = await db_1.default.subject.findMany();
+        const subjects = await db_1.default.subject.findMany({ where: { tenantId } });
         const colToSubjectId = {};
         // Scan Row 1 cells to map column indices to subjectIds dynamically
         const row1 = worksheet.getRow(1);
@@ -1506,13 +1546,14 @@ const importAllReportGrades = async (req, res, next) => {
         const dbErrors = [];
         await db_1.default.$transaction(async (tx) => {
             for (const item of gradesToUpsert) {
-                const student = await tx.student.findUnique({ where: { nis: item.nis } });
+                const student = await tx.student.findFirst({ where: { nis: item.nis, tenantId } });
                 if (!student) {
                     throw new Error(`Student with NIS '${item.nis}' not found in the database.`);
                 }
                 await tx.reportGrade.upsert({
                     where: {
-                        studentId_subjectId_academicYearId_semester: {
+                        tenantId_studentId_subjectId_academicYearId_semester: {
+                            tenantId,
                             studentId: student.id,
                             subjectId: item.subjectId,
                             academicYearId: activeYear.id,
@@ -1521,6 +1562,7 @@ const importAllReportGrades = async (req, res, next) => {
                     },
                     update: { score: item.score },
                     create: {
+                        tenantId,
                         studentId: student.id,
                         subjectId: item.subjectId,
                         academicYearId: activeYear.id,
@@ -1530,7 +1572,7 @@ const importAllReportGrades = async (req, res, next) => {
                 });
                 savedCount++;
             }
-        }).catch((err) => {
+        }, { maxWait: 100000, timeout: 100000 }).catch((err) => {
             dbErrors.push(err.message);
         });
         fs_1.default.unlinkSync(req.file.path);
@@ -1552,18 +1594,19 @@ exports.importAllReportGrades = importAllReportGrades;
 // Export Exam template or existing grades for ALL Subjects
 const exportAllExamGrades = async (req, res, next) => {
     try {
-        const activeYear = await getActiveYear();
+        const tenantId = req.user.tenantId;
+        const activeYear = await getActiveYear(req.user.tenantId);
         if (!activeYear) {
             return res.status(404).json({ message: 'No active academic year found' });
         }
-        const subjects = await db_1.default.subject.findMany({
-            orderBy: [
+        const subjects = await db_1.default.subject.findMany({ where: { tenantId }, orderBy: [
                 { group: 'asc' },
                 { order: 'asc' },
                 { name: 'asc' }
             ]
         });
         const students = await db_1.default.student.findMany({
+            where: { tenantId },
             orderBy: { name: 'asc' },
             include: {
                 examGrades: {
@@ -1671,10 +1714,11 @@ exports.exportAllExamGrades = exportAllExamGrades;
 // Import Exam grades for ALL Subjects
 const importAllExamGrades = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         if (!req.file) {
             return res.status(400).json({ message: 'No Excel file uploaded' });
         }
-        const activeYear = await getActiveYear();
+        const activeYear = await getActiveYear(tenantId);
         if (!activeYear) {
             fs_1.default.unlinkSync(req.file.path);
             return res.status(404).json({ message: 'No active academic year found' });
@@ -1686,7 +1730,7 @@ const importAllExamGrades = async (req, res, next) => {
             fs_1.default.unlinkSync(req.file.path);
             return res.status(400).json({ message: 'Worksheet not found' });
         }
-        const subjects = await db_1.default.subject.findMany();
+        const subjects = await db_1.default.subject.findMany({ where: { tenantId } });
         const colToSubjectId = {};
         // Scan Row 1 cells to map column indices to subjectIds
         const row1 = worksheet.getRow(1);
@@ -1743,13 +1787,14 @@ const importAllExamGrades = async (req, res, next) => {
         const dbErrors = [];
         await db_1.default.$transaction(async (tx) => {
             for (const item of gradesToUpsert) {
-                const student = await tx.student.findUnique({ where: { nis: item.nis } });
+                const student = await tx.student.findFirst({ where: { nis: item.nis, tenantId } });
                 if (!student) {
                     throw new Error(`Student with NIS '${item.nis}' not found in the database.`);
                 }
                 await tx.examGrade.upsert({
                     where: {
-                        studentId_subjectId_academicYearId: {
+                        tenantId_studentId_subjectId_academicYearId: {
+                            tenantId,
                             studentId: student.id,
                             subjectId: item.subjectId,
                             academicYearId: activeYear.id,
@@ -1757,6 +1802,7 @@ const importAllExamGrades = async (req, res, next) => {
                     },
                     update: { score: item.score },
                     create: {
+                        tenantId,
                         studentId: student.id,
                         subjectId: item.subjectId,
                         academicYearId: activeYear.id,
@@ -1765,7 +1811,7 @@ const importAllExamGrades = async (req, res, next) => {
                 });
                 savedCount++;
             }
-        }).catch((err) => {
+        }, { maxWait: 100000, timeout: 100000 }).catch((err) => {
             dbErrors.push(err.message);
         });
         fs_1.default.unlinkSync(req.file.path);

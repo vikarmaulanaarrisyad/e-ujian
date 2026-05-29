@@ -31,9 +31,10 @@ const resolveLogoUrl = (profile, req) => {
 const getStudentDocumentData = async (req, res, next) => {
     try {
         const { id } = req.params;
+        const tenantId = req.user.tenantId;
         // Fetch active academic year and grade weights
         const activeYear = await db_1.default.academicYear.findFirst({
-            where: { isActive: true },
+            where: { isActive: true, tenantId },
             include: { gradeWeights: true },
         });
         if (!activeYear) {
@@ -43,7 +44,7 @@ const getStudentDocumentData = async (req, res, next) => {
         const rWeight = weight.reportPercentage / 100.0;
         const eWeight = weight.examPercentage / 100.0;
         // Fetch school profile
-        let profile = await db_1.default.schoolProfile.findFirst() || defaultProfile();
+        let profile = await db_1.default.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
         profile = resolveLogoUrl({ ...profile }, req);
         // Fetch student with all their grades
         const student = await db_1.default.student.findUnique({
@@ -67,6 +68,7 @@ const getStudentDocumentData = async (req, res, next) => {
         }
         // Fetch all subjects to build a complete list of grades
         const subjects = await db_1.default.subject.findMany({
+            where: { tenantId },
             orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
         });
         const activeSemestersStr = weight.activeSemesters || "7,8,9,10,11";
@@ -140,20 +142,21 @@ exports.getStudentDocumentData = getStudentDocumentData;
 // Get all graduated students data for batch SKL printing
 const getAllGraduatedSklData = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         // Fetch active academic year
         const activeYear = await db_1.default.academicYear.findFirst({
-            where: { isActive: true },
+            where: { isActive: true, tenantId },
             include: { gradeWeights: true },
         });
         if (!activeYear) {
             return res.status(404).json({ message: 'Tidak ada tahun ajaran aktif.' });
         }
         // Fetch school profile
-        let profile = await db_1.default.schoolProfile.findFirst() || defaultProfile();
+        let profile = await db_1.default.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
         profile = resolveLogoUrl({ ...profile }, req);
         // Fetch all graduated students ordered by sklNumber then name
         const students = await db_1.default.student.findMany({
-            where: { isGraduated: true },
+            where: { isGraduated: true, tenantId },
             orderBy: [{ sklNumber: 'asc' }, { name: 'asc' }],
         });
         if (students.length === 0) {

@@ -6,4 +6,5 @@ const auth_middleware_1 = require("../middlewares/auth.middleware");
 const router = (0, express_1.Router)();
 router.post('/login', auth_controller_1.login);
 router.get('/me', auth_middleware_1.authenticateJWT, auth_controller_1.getMe);
+router.post('/switch-tenant', auth_middleware_1.authenticateJWT, auth_controller_1.switchTenant);
 exports.default = router;

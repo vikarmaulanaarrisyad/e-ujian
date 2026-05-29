@@ -7,21 +7,24 @@ exports.importBackup = exports.exportBackup = void 0;
 const db_1 = __importDefault(require("../db"));
 const fs_1 = __importDefault(require("fs"));
 const activityLog_1 = require("../lib/activityLog");
+const adm_zip_1 = __importDefault(require("adm-zip"));
+const path_1 = __importDefault(require("path"));
 // ==========================================
 // BACKUP EXPORT
 // ==========================================
 const exportBackup = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         // Fetch all tables in FK-safe order
         const [users, schoolProfiles, academicYears, subjects, gradeWeights, students, reportGrades, examGrades,] = await Promise.all([
-            db_1.default.user.findMany(),
-            db_1.default.schoolProfile.findMany(),
-            db_1.default.academicYear.findMany(),
-            db_1.default.subject.findMany(),
-            db_1.default.gradeWeight.findMany(),
-            db_1.default.student.findMany(),
-            db_1.default.reportGrade.findMany(),
-            db_1.default.examGrade.findMany(),
+            db_1.default.user.findMany({ where: { tenantId } }),
+            db_1.default.schoolProfile.findMany({ where: { tenantId } }),
+            db_1.default.academicYear.findMany({ where: { tenantId } }),
+            db_1.default.subject.findMany({ where: { tenantId } }),
+            db_1.default.gradeWeight.findMany({ where: { tenantId } }),
+            db_1.default.student.findMany({ where: { tenantId } }),
+            db_1.default.reportGrade.findMany({ where: { tenantId } }),
+            db_1.default.examGrade.findMany({ where: { tenantId } }),
         ]);
         const backup = {
             metadata: {
@@ -50,14 +53,34 @@ const exportBackup = async (req, res, next) => {
                 examGrades,
             },
         };
+        const zip = new adm_zip_1.default();
+        // Add database JSON
+        const jsonContent = JSON.stringify(backup, null, 2);
+        zip.addFile('backup_data.json', Buffer.from(jsonContent, 'utf-8'));
+        // Add uploads folder if it exists
+        const uploadsPath = path_1.default.join(process.cwd(), 'uploads');
+        if (fs_1.default.existsSync(uploadsPath)) {
+            // Check if folder is not empty before adding
+            const files = fs_1.default.readdirSync(uploadsPath);
+            if (files.length > 0) {
+                zip.addLocalFolder(uploadsPath, 'uploads');
+            }
+        }
+        const zipBuffer = zip.toBuffer();
         const now = new Date();
         const pad = (n) => String(n).padStart(2, '0');
         const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
-        const fileName = `backup_sipanmu_${timestamp}.json`;
-        res.setHeader('Content-Type', 'application/json');
+        const fileName = `backup_sipanmu_${timestamp}.zip`;
+        res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-        (0, activityLog_1.logActivity)({ req, action: 'EXPORT_BACKUP', entity: 'Backup', description: `Mengunduh backup database: ${fileName}`, metadata: { fileName, totalRecords: backup.metadata.totalRecords } });
-        return res.status(200).json(backup);
+        (0, activityLog_1.logActivity)({
+            req,
+            action: 'EXPORT_BACKUP',
+            entity: 'Backup',
+            description: `Mengunduh backup lengkap (database + uploads): ${fileName}`,
+            metadata: { fileName, totalRecords: backup.metadata.totalRecords }
+        });
+        return res.status(200).send(zipBuffer);
     }
     catch (error) {
         next(error);
@@ -72,15 +95,35 @@ const importBackup = async (req, res, next) => {
         return res.status(400).json({ message: 'No backup file uploaded.' });
     }
     const filePath = req.file.path;
+    const isZip = req.file.originalname.endsWith('.zip') || req.file.mimetype === 'application/zip';
     try {
-        const raw = fs_1.default.readFileSync(filePath, 'utf-8');
+        let backupContent = '';
+        if (isZip) {
+            const zip = new adm_zip_1.default(filePath);
+            const zipEntries = zip.getEntries();
+            // Find backup_data.json inside zip
+            const dataEntry = zipEntries.find(entry => entry.entryName === 'backup_data.json');
+            if (!dataEntry) {
+                fs_1.default.unlinkSync(filePath);
+                return res.status(400).json({ message: 'File backup (.zip) tidak valid. File backup_data.json tidak ditemukan.' });
+            }
+            backupContent = dataEntry.getData().toString('utf8');
+            // Extract uploads/ folder into root uploads/ directory if it exists in zip
+            const hasUploads = zipEntries.some(entry => entry.entryName.startsWith('uploads/'));
+            if (hasUploads) {
+                zip.extractEntryTo('uploads/', process.cwd(), true, true);
+            }
+        }
+        else {
+            backupContent = fs_1.default.readFileSync(filePath, 'utf-8');
+        }
         let backup;
         try {
-            backup = JSON.parse(raw);
+            backup = JSON.parse(backupContent);
         }
         catch {
             fs_1.default.unlinkSync(filePath);
-            return res.status(400).json({ message: 'File backup tidak valid. Pastikan file adalah JSON yang benar.' });
+            return res.status(400).json({ message: 'File backup tidak valid. Pastikan file adalah format JSON atau ZIP yang benar.' });
         }
         // Validate structure
         if (!backup?.metadata || !backup?.data) {
@@ -126,9 +169,17 @@ const importBackup = async (req, res, next) => {
             }
         }, { timeout: 60000 });
         fs_1.default.unlinkSync(filePath);
-        (0, activityLog_1.logActivity)({ req, action: 'IMPORT_BACKUP', entity: 'Backup', description: `Me-restore database dari file backup (dibuat: ${backup.metadata?.createdAt})`, metadata: { restoredCounts: { students: students.length, reportGrades: reportGrades.length, examGrades: examGrades.length } } });
+        (0, activityLog_1.logActivity)({
+            req,
+            action: 'IMPORT_BACKUP',
+            entity: 'Backup',
+            description: `Me-restore database dari file backup (dibuat: ${backup.metadata?.createdAt})`,
+            metadata: { restoredCounts: { students: students.length, reportGrades: reportGrades.length, examGrades: examGrades.length } }
+        });
         return res.status(200).json({
-            message: 'Database berhasil di-restore dari file backup.',
+            message: isZip
+                ? 'Database dan file uploads berhasil di-restore dari file backup.'
+                : 'Database berhasil di-restore dari file backup.',
             restoredAt: new Date().toISOString(),
             backupCreatedAt: backup.metadata?.createdAt,
             restored: {

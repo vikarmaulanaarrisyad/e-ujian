@@ -28,7 +28,7 @@ async function logActivity({ req, action, entity, entityId, description, metadat
                 entity,
                 entityId: entityId ?? null,
                 description,
-                metadata: metadata ?? undefined,
+                metadata: metadata ? JSON.stringify(metadata) : null,
                 ipAddress: ip ?? null,
             },
         });

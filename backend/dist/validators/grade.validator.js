@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveExamGradesSchema = exports.examGradeItemSchema = exports.saveReportGradesSchema = exports.reportGradeItemSchema = exports.updateGradeWeightSchema = void 0;
+exports.saveTkaGradesSchema = exports.tkaGradeItemSchema = exports.saveExamGradesSchema = exports.examGradeItemSchema = exports.saveReportGradesSchema = exports.reportGradeItemSchema = exports.updateGradeWeightSchema = void 0;
 const zod_1 = require("zod");
 exports.updateGradeWeightSchema = zod_1.z.object({
     reportPercentage: zod_1.z.number().min(0).max(100, 'Report percentage must be between 0 and 100'),
@@ -26,4 +26,12 @@ exports.examGradeItemSchema = zod_1.z.object({
 });
 exports.saveExamGradesSchema = zod_1.z.object({
     grades: zod_1.z.array(exports.examGradeItemSchema),
+});
+exports.tkaGradeItemSchema = zod_1.z.object({
+    studentId: zod_1.z.string(),
+    subjectType: zod_1.z.enum(['MATEMATIKA', 'BAHASA_INDONESIA']),
+    score: zod_1.z.number().min(0).max(100, 'Score must be between 0 and 100'),
+});
+exports.saveTkaGradesSchema = zod_1.z.object({
+    grades: zod_1.z.array(exports.tkaGradeItemSchema),
 });

@@ -19,6 +19,12 @@ import {
   getSubjects,
   getMissingGrades,
 } from '../controllers/grade.controller';
+import {
+  getTkaGrades,
+  saveTkaGrades,
+  exportTkaGrades,
+  importTkaGrades,
+} from '../controllers/tka.controller';
 import { authenticateJWT } from '../middlewares/auth.middleware';
 import { requireRoles } from '../middlewares/rbac.middleware';
 import { upload } from '../middlewares/upload.middleware';
@@ -51,6 +57,12 @@ router.get('/exams/export', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), exp
 router.get('/exams/export-all', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), exportAllExamGrades);
 router.post('/exams/import', requireRoles(Role.ADMIN, Role.STAFF), upload.single('file'), importExamGrades);
 router.post('/exams/import-all', requireRoles(Role.ADMIN, Role.STAFF), upload.single('file'), importAllExamGrades);
+
+// TKA grades
+router.get('/tka', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getTkaGrades);
+router.post('/tka', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), saveTkaGrades);
+router.get('/tka/export', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), exportTkaGrades);
+router.post('/tka/import', requireRoles(Role.ADMIN, Role.STAFF), upload.single('file'), importTkaGrades);
 
 // Final calculated grade recap
 router.get('/recap', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getGradeRecap);

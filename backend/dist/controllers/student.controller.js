@@ -14,6 +14,7 @@ const activityLog_1 = require("../lib/activityLog");
 // Get all students
 const getAllStudents = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { name, nis, class: className } = req.query;
         const filter = {};
         if (name) {
@@ -28,6 +29,7 @@ const getAllStudents = async (req, res, next) => {
         // Alumni filter
         const isAlumniParam = req.query.alumni === 'true';
         filter.isAlumni = isAlumniParam;
+        filter.tenantId = tenantId;
         const students = await db_1.default.student.findMany({
             where: filter,
             orderBy: { name: 'asc' },
@@ -42,9 +44,10 @@ exports.getAllStudents = getAllStudents;
 // Get single student
 const getStudentById = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { id } = req.params;
         const student = await db_1.default.student.findUnique({
-            where: { id },
+            where: { id, tenantId },
         });
         if (!student) {
             return res.status(404).json({ message: 'Student not found' });
@@ -59,6 +62,7 @@ exports.getStudentById = getStudentById;
 // Create student
 const createStudent = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const validation = student_validator_1.createStudentSchema.safeParse(req.body);
         if (!validation.success) {
             return res.status(400).json({
@@ -67,16 +71,16 @@ const createStudent = async (req, res, next) => {
             });
         }
         const { nis, nisn } = validation.data;
-        const existingNis = await db_1.default.student.findUnique({ where: { nis } });
+        const existingNis = await db_1.default.student.findFirst({ where: { nis, tenantId } });
         if (existingNis) {
             return res.status(400).json({ message: 'NIS already registered' });
         }
-        const existingNisn = await db_1.default.student.findUnique({ where: { nisn } });
+        const existingNisn = await db_1.default.student.findFirst({ where: { nisn, tenantId } });
         if (existingNisn) {
             return res.status(400).json({ message: 'NISN already registered' });
         }
         const student = await db_1.default.student.create({
-            data: validation.data,
+            data: { ...validation.data, tenantId },
         });
         (0, activityLog_1.logActivity)({ req, action: 'CREATE_STUDENT', entity: 'Student', entityId: student.id, description: `Menambahkan siswa baru: ${student.name} (NIS: ${student.nis})` });
         return res.status(201).json({
@@ -92,6 +96,7 @@ exports.createStudent = createStudent;
 // Update student
 const updateStudent = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { id } = req.params;
         const validation = student_validator_1.updateStudentSchema.safeParse(req.body);
         if (!validation.success) {
@@ -106,20 +111,20 @@ const updateStudent = async (req, res, next) => {
         }
         const { nis, nisn } = validation.data;
         if (nis && nis !== student.nis) {
-            const existingNis = await db_1.default.student.findUnique({ where: { nis } });
+            const existingNis = await db_1.default.student.findFirst({ where: { nis, tenantId } });
             if (existingNis) {
                 return res.status(400).json({ message: 'NIS already registered' });
             }
         }
         if (nisn && nisn !== student.nisn) {
-            const existingNisn = await db_1.default.student.findUnique({ where: { nisn } });
+            const existingNisn = await db_1.default.student.findFirst({ where: { nisn, tenantId } });
             if (existingNisn) {
                 return res.status(400).json({ message: 'NISN already registered' });
             }
         }
         const updatedStudent = await db_1.default.student.update({
-            where: { id },
-            data: validation.data,
+            where: { id, tenantId },
+            data: { ...validation.data, tenantId },
         });
         (0, activityLog_1.logActivity)({ req, action: 'UPDATE_STUDENT', entity: 'Student', entityId: id, description: `Memperbarui data siswa: ${student.name} (NIS: ${student.nis})` });
         return res.status(200).json({
@@ -135,13 +140,14 @@ exports.updateStudent = updateStudent;
 // Delete student
 const deleteStudent = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { id } = req.params;
         const student = await db_1.default.student.findUnique({ where: { id } });
         if (!student) {
             return res.status(404).json({ message: 'Student not found' });
         }
         await db_1.default.student.delete({
-            where: { id },
+            where: { id, tenantId },
         });
         (0, activityLog_1.logActivity)({ req, action: 'DELETE_STUDENT', entity: 'Student', entityId: id, description: `Menghapus data siswa: ${student.name} (NIS: ${student.nis})` });
         return res.status(200).json({ message: 'Student deleted successfully' });
@@ -154,6 +160,7 @@ exports.deleteStudent = deleteStudent;
 // Get empty Excel template
 const getStudentTemplate = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const workbook = new exceljs_1.default.Workbook();
         const worksheet = workbook.addWorksheet('Template Siswa');
         worksheet.columns = [
@@ -197,7 +204,9 @@ exports.getStudentTemplate = getStudentTemplate;
 // Export students to Excel
 const exportStudents = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const students = await db_1.default.student.findMany({
+            where: { tenantId },
             orderBy: { name: 'asc' },
         });
         const workbook = new exceljs_1.default.Workbook();
@@ -303,6 +312,7 @@ const parseFlexibleDate = (val) => {
 // Import students from Excel
 const importStudents = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         if (!req.file) {
             return res.status(400).json({ message: 'No Excel file uploaded' });
         }
@@ -364,15 +374,15 @@ const importStudents = async (req, res, next) => {
         const dbErrors = [];
         await db_1.default.$transaction(async (tx) => {
             for (const student of studentsToInsert) {
-                const existingNis = await tx.student.findUnique({ where: { nis: student.nis } });
+                const existingNis = await tx.student.findFirst({ where: { nis: student.nis, tenantId } });
                 if (existingNis) {
                     throw new Error(`NIS '${student.nis}' is already registered in the system.`);
                 }
-                const existingNisn = await tx.student.findUnique({ where: { nisn: student.nisn } });
+                const existingNisn = await tx.student.findFirst({ where: { nisn: student.nisn, tenantId } });
                 if (existingNisn) {
                     throw new Error(`NISN '${student.nisn}' is already registered in the system.`);
                 }
-                await tx.student.create({ data: student });
+                await tx.student.create({ data: { ...student, tenantId } });
                 successCount++;
             }
         }).catch((err) => {
@@ -398,6 +408,7 @@ exports.importStudents = importStudents;
 // Update graduation status
 const updateGraduationStatus = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { id } = req.params;
         const { isGraduated, graduationDate, certificateNumber } = req.body;
         const student = await db_1.default.student.findUnique({ where: { id } });
@@ -405,13 +416,13 @@ const updateGraduationStatus = async (req, res, next) => {
             return res.status(404).json({ message: 'Student not found' });
         }
         if (certificateNumber && certificateNumber !== student.certificateNumber) {
-            const existing = await db_1.default.student.findUnique({ where: { certificateNumber } });
+            const existing = await db_1.default.student.findFirst({ where: { certificateNumber, tenantId } });
             if (existing) {
                 return res.status(400).json({ message: 'Nomor seri ijazah sudah digunakan oleh siswa lain.' });
             }
         }
         const updated = await db_1.default.student.update({
-            where: { id },
+            where: { id, tenantId },
             data: {
                 isGraduated,
                 graduationDate: graduationDate ? new Date(graduationDate) : null,
@@ -429,12 +440,13 @@ exports.updateGraduationStatus = updateGraduationStatus;
 // Batch update graduation status
 const batchUpdateGraduation = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { studentIds, isGraduated, graduationDate } = req.body;
         if (!Array.isArray(studentIds) || studentIds.length === 0) {
             return res.status(400).json({ message: 'Daftar ID siswa tidak valid.' });
         }
         await db_1.default.student.updateMany({
-            where: { id: { in: studentIds } },
+            where: { id: { in: studentIds }, tenantId },
             data: {
                 isGraduated,
                 graduationDate: graduationDate ? new Date(graduationDate) : null,
@@ -451,15 +463,16 @@ exports.batchUpdateGraduation = batchUpdateGraduation;
 // Batch assign SKL numbers to all graduated students
 const batchAssignSklNumbers = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         const { format, overwrite } = req.body;
         // format: e.g. "B.{seq}/MI.BH/{year}" — if not provided, use school profile format
         // overwrite: boolean — if true, reassign even if student already has a sklNumber
         // Get school profile for default format
-        const profile = await db_1.default.schoolProfile.findFirst();
+        const profile = await db_1.default.schoolProfile.findUnique({ where: { tenantId } });
         const numberFormat = format || profile?.sklNumberFormat || 'B.{seq}/MI.BH/{year}';
         // Fetch all graduated students ordered by name
         const students = await db_1.default.student.findMany({
-            where: { isGraduated: true },
+            where: { isGraduated: true, tenantId },
             orderBy: { name: 'asc' },
         });
         if (students.length === 0) {
@@ -512,6 +525,7 @@ exports.batchAssignSklNumbers = batchAssignSklNumbers;
 // Upload photos via ZIP
 const uploadPhotos = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         if (!req.file) {
             return res.status(400).json({ message: 'Tidak ada file ZIP yang diunggah.' });
         }
@@ -547,7 +561,7 @@ const uploadPhotos = async (req, res, next) => {
             if (!nisn)
                 continue;
             // Check if student with this NISN exists
-            const student = await db_1.default.student.findUnique({ where: { nisn } });
+            const student = await db_1.default.student.findFirst({ where: { nisn, tenantId } });
             if (!student) {
                 errors.push(`NISN ${nisn} tidak ditemukan di database (${fileName}).`);
                 continue;
@@ -585,26 +599,27 @@ exports.uploadPhotos = uploadPhotos;
 // Archive graduated students to Alumni
 const archiveStudents = async (req, res, next) => {
     try {
+        const tenantId = req.user.tenantId;
         // Cari siswa yang sudah lulus tapi belum jadi alumni
         const graduatedStudents = await db_1.default.student.findMany({
             where: {
                 isGraduated: true,
                 isAlumni: false,
+                tenantId,
             },
         });
         if (graduatedStudents.length === 0) {
             return res.status(400).json({ message: 'Tidak ada siswa lulus yang bisa diarsipkan.' });
         }
         // Dapatkan tahun ajaran aktif untuk label alumni
-        const activeYearRecord = await db_1.default.academicYear.findFirst({
-            where: { isActive: true },
-        });
+        const activeYearRecord = await db_1.default.academicYear.findFirst({ where: { isActive: true, tenantId } });
         const alumniYearStr = activeYearRecord ? activeYearRecord.year : new Date().getFullYear().toString();
         // Lakukan pemindahan secara massal
         const result = await db_1.default.student.updateMany({
             where: {
                 isGraduated: true,
                 isAlumni: false,
+                tenantId,
             },
             data: {
                 isAlumni: true,

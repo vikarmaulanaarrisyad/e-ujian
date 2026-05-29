@@ -1,17 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const user_controller_1 = require("../controllers/user.controller");
+const sync_controller_1 = require("../controllers/sync.controller");
 const auth_middleware_1 = require("../middlewares/auth.middleware");
 const rbac_middleware_1 = require("../middlewares/rbac.middleware");
 const enums_1 = require("../types/enums");
 const router = (0, express_1.Router)();
-// Protect all routes
 router.use(auth_middleware_1.authenticateJWT);
-// Only ADMIN can manage users
-router.use((0, rbac_middleware_1.requireRoles)(enums_1.Role.ADMIN));
-router.get('/', user_controller_1.getUsers);
-router.post('/', user_controller_1.createUser);
-router.put('/:id', user_controller_1.updateUser);
-router.delete('/:id', user_controller_1.deleteUser);
+// Only Super Admin or Admin can trigger sync
+router.post('/mysql', (0, rbac_middleware_1.requireRoles)(enums_1.Role.SUPER_ADMIN, enums_1.Role.ADMIN), sync_controller_1.syncDatabase);
 exports.default = router;

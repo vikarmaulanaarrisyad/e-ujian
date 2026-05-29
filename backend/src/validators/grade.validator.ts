@@ -29,3 +29,13 @@ export const examGradeItemSchema = z.object({
 export const saveExamGradesSchema = z.object({
   grades: z.array(examGradeItemSchema),
 });
+
+export const tkaGradeItemSchema = z.object({
+  studentId: z.string(),
+  subjectType: z.enum(['MATEMATIKA', 'BAHASA_INDONESIA']),
+  score: z.number().min(0).max(100, 'Score must be between 0 and 100'),
+});
+
+export const saveTkaGradesSchema = z.object({
+  grades: z.array(tkaGradeItemSchema),
+});

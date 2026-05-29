@@ -1,10 +1,40 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteAcademicYear = exports.updateGradeWeight = exports.activateAcademicYear = exports.createAcademicYear = exports.getAllAcademicYears = void 0;
-const db_1 = __importDefault(require("../db"));
+const db_1 = __importStar(require("../db"));
 const activityLog_1 = require("../lib/activityLog");
 const getAllAcademicYears = async (req, res, next) => {
     try {
@@ -27,37 +57,52 @@ exports.getAllAcademicYears = getAllAcademicYears;
 const createAcademicYear = async (req, res, next) => {
     try {
         const { year, semester } = req.body; // e.g., year: "2026/2027", semester: "ODD"
-        const existing = await db_1.default.academicYear.findUnique({
+        const currentUserTenantId = req.user.tenantId;
+        const existing = await db_1.default.academicYear.findFirst({
             where: {
-                year_semester: {
-                    year,
-                    semester: semester,
-                },
+                year,
+                semester: semester,
             },
         });
         if (existing) {
             return res.status(400).json({ message: 'Tahun Ajaran dan Semester ini sudah ada.' });
         }
-        const academicYear = await db_1.default.academicYear.create({
-            data: {
-                year,
-                semester: semester,
-                isActive: false, // by default not active until explicitly activated
-                gradeWeights: {
-                    create: {
-                        reportPercentage: 60.0,
-                        examPercentage: 40.0,
-                    },
-                },
-            },
-            include: {
-                gradeWeights: true,
-            },
+        const tenants = await db_1.default.tenant.findMany();
+        let createdYear;
+        for (const tenant of tenants) {
+            await db_1.tenantContext.run(tenant.id, async () => {
+                const existingYear = await db_1.default.academicYear.findFirst({
+                    where: { year, semester: semester },
+                });
+                if (!existingYear) {
+                    const academicYear = await db_1.default.academicYear.create({
+                        data: {
+                            year,
+                            semester: semester,
+                            isActive: false, // by default not active until explicitly activated
+                        },
+                    });
+                    await db_1.default.gradeWeight.create({
+                        data: {
+                            academicYearId: academicYear.id,
+                            reportPercentage: 60.0,
+                            examPercentage: 40.0,
+                        },
+                    });
+                    if (tenant.id === currentUserTenantId) {
+                        createdYear = academicYear;
+                    }
+                }
+            });
+        }
+        const completeAcademicYear = await db_1.default.academicYear.findUnique({
+            where: { id: createdYear?.id },
+            include: { gradeWeights: true },
         });
-        (0, activityLog_1.logActivity)({ req, action: 'CREATE_ACADEMIC_YEAR', entity: 'AcademicYear', entityId: academicYear.id, description: `Membuat tahun ajaran baru: ${year} - ${semester}` });
+        (0, activityLog_1.logActivity)({ req, action: 'CREATE_ACADEMIC_YEAR', entity: 'AcademicYear', entityId: createdYear?.id || 'ALL', description: `Membuat tahun ajaran baru: ${year} - ${semester} (Dinamis semua sekolah)` });
         return res.status(201).json({
-            message: 'Tahun Ajaran berhasil dibuat.',
-            data: academicYear,
+            message: 'Tahun Ajaran berhasil dibuat untuk semua sekolah.',
+            data: completeAcademicYear,
         });
     }
     catch (error) {
@@ -73,20 +118,31 @@ const activateAcademicYear = async (req, res, next) => {
         if (!target) {
             return res.status(404).json({ message: 'Tahun Ajaran tidak ditemukan.' });
         }
-        // Transaction to ensure data consistency
-        await db_1.default.$transaction([
-            // Deactivate all
-            db_1.default.academicYear.updateMany({
-                data: { isActive: false },
-            }),
-            // Activate the selected one
-            db_1.default.academicYear.update({
-                where: { id },
-                data: { isActive: true },
-            }),
-        ]);
-        (0, activityLog_1.logActivity)({ req, action: 'ACTIVATE_ACADEMIC_YEAR', entity: 'AcademicYear', entityId: id, description: `Mengaktifkan tahun ajaran: ${target.year} - ${target.semester}` });
-        return res.status(200).json({ message: 'Tahun Ajaran berhasil diaktifkan.' });
+        const { year, semester } = target;
+        const tenants = await db_1.default.tenant.findMany();
+        for (const tenant of tenants) {
+            await db_1.tenantContext.run(tenant.id, async () => {
+                const tenantYear = await db_1.default.academicYear.findFirst({
+                    where: { year, semester }
+                });
+                if (tenantYear) {
+                    // Transaction to ensure data consistency
+                    await db_1.default.$transaction([
+                        // Deactivate all
+                        db_1.default.academicYear.updateMany({
+                            data: { isActive: false },
+                        }),
+                        // Activate the selected one
+                        db_1.default.academicYear.update({
+                            where: { id: tenantYear.id },
+                            data: { isActive: true },
+                        }),
+                    ]);
+                }
+            });
+        }
+        (0, activityLog_1.logActivity)({ req, action: 'ACTIVATE_ACADEMIC_YEAR', entity: 'AcademicYear', entityId: id, description: `Mengaktifkan tahun ajaran: ${target.year} - ${target.semester} (Dinamis semua sekolah)` });
+        return res.status(200).json({ message: 'Tahun Ajaran berhasil diaktifkan untuk semua sekolah.' });
     }
     catch (error) {
         next(error);

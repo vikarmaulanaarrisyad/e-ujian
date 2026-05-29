@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import prisma from '../db';
+import prisma, { tenantContext } from '../db';
 import { SemesterType } from '../types/enums';
 import { logActivity } from '../lib/activityLog';
 
@@ -23,6 +23,7 @@ export const getAllAcademicYears = async (req: Request, res: Response, next: Nex
 export const createAcademicYear = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { year, semester } = req.body; // e.g., year: "2026/2027", semester: "ODD"
+    const currentUserTenantId = (req as any).user.tenantId;
 
     const existing = await prisma.academicYear.findFirst({
       where: {
@@ -35,31 +36,48 @@ export const createAcademicYear = async (req: Request, res: Response, next: Next
       return res.status(400).json({ message: 'Tahun Ajaran dan Semester ini sudah ada.' });
     }
 
-    const academicYear = await (prisma.academicYear.create as any)({
-      data: {
-        year,
-        semester: semester as SemesterType,
-        isActive: false, // by default not active until explicitly activated
-      },
-    });
+    const tenants = await prisma.tenant.findMany();
+    let createdYear: any;
 
-    await (prisma.gradeWeight.create as any)({
-      data: {
-        academicYearId: academicYear.id,
-        reportPercentage: 60.0,
-        examPercentage: 40.0,
-      },
-    });
+    for (const tenant of tenants) {
+      await tenantContext.run(tenant.id, async () => {
+        const existingYear = await prisma.academicYear.findFirst({
+          where: { year, semester: semester as SemesterType },
+        });
+
+        if (!existingYear) {
+          const academicYear = await (prisma.academicYear.create as any)({
+            data: {
+              year,
+              semester: semester as SemesterType,
+              isActive: false, // by default not active until explicitly activated
+            },
+          });
+
+          await (prisma.gradeWeight.create as any)({
+            data: {
+              academicYearId: academicYear.id,
+              reportPercentage: 60.0,
+              examPercentage: 40.0,
+            },
+          });
+
+          if (tenant.id === currentUserTenantId) {
+            createdYear = academicYear;
+          }
+        }
+      });
+    }
 
     const completeAcademicYear = await prisma.academicYear.findUnique({
-      where: { id: academicYear.id },
+      where: { id: createdYear?.id },
       include: { gradeWeights: true },
     });
 
-    logActivity({ req, action: 'CREATE_ACADEMIC_YEAR', entity: 'AcademicYear', entityId: academicYear.id, description: `Membuat tahun ajaran baru: ${year} - ${semester}` });
+    logActivity({ req, action: 'CREATE_ACADEMIC_YEAR', entity: 'AcademicYear', entityId: createdYear?.id || 'ALL', description: `Membuat tahun ajaran baru: ${year} - ${semester} (Dinamis semua sekolah)` });
 
     return res.status(201).json({
-      message: 'Tahun Ajaran berhasil dibuat.',
+      message: 'Tahun Ajaran berhasil dibuat untuk semua sekolah.',
       data: completeAcademicYear,
     });
   } catch (error) {
@@ -77,22 +95,35 @@ export const activateAcademicYear = async (req: Request, res: Response, next: Ne
       return res.status(404).json({ message: 'Tahun Ajaran tidak ditemukan.' });
     }
 
-    // Transaction to ensure data consistency
-    await prisma.$transaction([
-      // Deactivate all
-      (prisma.academicYear.updateMany as any)({
-        data: { isActive: false },
-      }),
-      // Activate the selected one
-      (prisma.academicYear.update as any)({
-        where: { id },
-        data: { isActive: true },
-      }),
-    ]);
+    const { year, semester } = target;
+    const tenants = await prisma.tenant.findMany();
 
-    logActivity({ req, action: 'ACTIVATE_ACADEMIC_YEAR', entity: 'AcademicYear', entityId: id, description: `Mengaktifkan tahun ajaran: ${target.year} - ${target.semester}` });
+    for (const tenant of tenants) {
+      await tenantContext.run(tenant.id, async () => {
+        const tenantYear = await prisma.academicYear.findFirst({
+          where: { year, semester }
+        });
 
-    return res.status(200).json({ message: 'Tahun Ajaran berhasil diaktifkan.' });
+        if (tenantYear) {
+          // Transaction to ensure data consistency
+          await prisma.$transaction([
+            // Deactivate all
+            (prisma.academicYear.updateMany as any)({
+              data: { isActive: false },
+            }),
+            // Activate the selected one
+            (prisma.academicYear.update as any)({
+              where: { id: tenantYear.id },
+              data: { isActive: true },
+            }),
+          ]);
+        }
+      });
+    }
+
+    logActivity({ req, action: 'ACTIVATE_ACADEMIC_YEAR', entity: 'AcademicYear', entityId: id, description: `Mengaktifkan tahun ajaran: ${target.year} - ${target.semester} (Dinamis semua sekolah)` });
+
+    return res.status(200).json({ message: 'Tahun Ajaran berhasil diaktifkan untuk semua sekolah.' });
   } catch (error) {
     next(error);
   }
