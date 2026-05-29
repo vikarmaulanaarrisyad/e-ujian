@@ -59,8 +59,8 @@ export default function SubjectsPage() {
   // Delete State
   const [deletingSubjectId, setDeletingSubjectId] = useState<string | null>(null);
 
-  // Guard: Admin only
-  const isAdmin = user?.role === 'ADMIN';
+  // Guard: Admin or Super Admin
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
   // Fetch Subjects
   const { data: subjects = [], isLoading } = useQuery<Subject[]>({

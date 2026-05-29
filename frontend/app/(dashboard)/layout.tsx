@@ -50,7 +50,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Manajemen Akses', href: '/dashboard/users', icon: Shield, roles: ['ADMIN'] },
     { name: 'Data Siswa', href: '/dashboard/students', icon: Users, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Data Alumni', href: '/dashboard/alumni', icon: GraduationCap, roles: ['ADMIN', 'GURU', 'STAFF'] },
-    { name: 'Mata Pelajaran', href: '/dashboard/subjects', icon: BookMarked, roles: ['SUPER_ADMIN'] },
+    { name: 'Mata Pelajaran', href: '/dashboard/subjects', icon: BookMarked, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { name: 'Input Nilai Rapor', href: '/dashboard/grades/reports', icon: BookOpen, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Input Nilai Ujian', href: '/dashboard/grades/exams', icon: FileSpreadsheet, roles: ['ADMIN', 'GURU', 'STAFF'] },
     { name: 'Input Nilai TKA', href: '/dashboard/grades/tka', icon: FileSpreadsheet, roles: ['ADMIN', 'GURU', 'STAFF'] },

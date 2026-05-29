@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import BatchTkaDownloader from '@/components/BatchTkaDownloader';
 
 export default function TkaGradesPage() {
   const { user } = useAuth();
@@ -202,7 +203,7 @@ export default function TkaGradesPage() {
       
       doc.setFont('times', 'bold');
       doc.setFontSize(14);
-      doc.text(data?.schoolProfile?.foundationName?.toUpperCase() || data?.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN", pageWidth / 2, 14, { align: 'center' });
+      doc.text(schoolProfile?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN", pageWidth / 2, 14, { align: 'center' });
       
       doc.setFontSize(18);
       doc.text(schoolProfile?.name || 'MI BUSTANUL HUDA 01 DAWUHAN', pageWidth / 2, 21, { align: 'center' });
@@ -326,6 +327,8 @@ export default function TkaGradesPage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
+          <BatchTkaDownloader />
+          
           {selectedSubjectType && (
             <button
               onClick={handleDownloadPDF}
