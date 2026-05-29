@@ -16,6 +16,8 @@ import {
   importAllExamGrades,
   getGradeRecap,
   exportGradeRecap,
+  getGradeSummary,
+  exportGradeSummary,
   getSubjects,
   getMissingGrades,
 } from '../controllers/grade.controller';
@@ -67,6 +69,10 @@ router.post('/tka/import', requireRoles(Role.ADMIN, Role.STAFF), upload.single('
 // Final calculated grade recap
 router.get('/recap', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getGradeRecap);
 router.get('/recap/export', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), exportGradeRecap);
+
+// Summary TKA & UM grades
+router.get('/summary', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getGradeSummary);
+router.get('/summary/export', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), exportGradeSummary);
 
 // Missing grades checker
 router.get('/missing', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getMissingGrades);

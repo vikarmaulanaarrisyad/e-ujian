@@ -11,6 +11,7 @@ import {
   updateGraduationStatus,
   batchUpdateGraduation,
   batchAssignSklNumbers,
+  batchAssignSknrNumbers,
   uploadPhotos,
   archiveStudents,
 } from '../controllers/student.controller';
@@ -42,5 +43,6 @@ router.delete('/:id', requireRoles(Role.ADMIN), deleteStudent);
 router.patch('/:id/graduation', requireRoles(Role.ADMIN, Role.STAFF), updateGraduationStatus);
 router.post('/graduation/batch', requireRoles(Role.ADMIN, Role.STAFF), batchUpdateGraduation);
 router.post('/graduation/assign-skl-numbers', requireRoles(Role.ADMIN, Role.STAFF), batchAssignSklNumbers);
+router.post('/graduation/assign-sknr-numbers', requireRoles(Role.ADMIN, Role.STAFF), batchAssignSknrNumbers);
 
 export default router;

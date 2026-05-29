@@ -94,6 +94,7 @@ model SchoolProfile {
   province        String?  // Provinsi
   logoUrl         String?  @map("logo_url")
   sklNumberFormat String?  @map("skl_number_format") // Format nomor SKL, e.g. "B.{seq}/MI.BH/{year}"
+  sknrNumberFormat String? @map("sknr_number_format") // Format nomor SKNR
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -140,6 +141,7 @@ model Student {
   graduationDate    DateTime? @map("graduation_date")
   certificateNumber String?   @map("certificate_number")
   sklNumber         String?   @map("skl_number") // Nomor SKL yang ditetapkan
+  sknrNumber        String?   @map("sknr_number") // Nomor SKNR yang ditetapkan
   isAlumni          Boolean   @default(false) @map("is_alumni")
   alumniYear        String?   @map("alumni_year")
   createdAt         DateTime  @default(now())

@@ -19,6 +19,7 @@ interface SchoolProfile {
   city: string;
   logoUrl: string | null;
   sklNumberFormat: string;
+  sknrNumberFormat: string;
 }
 
 export default function SchoolProfilePage() {
@@ -37,6 +38,7 @@ export default function SchoolProfilePage() {
     city: '',
     logoUrl: null,
     sklNumberFormat: 'B.{seq}/MI.BH/{year}',
+    sknrNumberFormat: 'B.{seq}/SKNR/MI.BH/{year}',
   });
   
   const [loading, setLoading] = useState(true);
@@ -61,6 +63,7 @@ export default function SchoolProfilePage() {
           city: data.city || '',
           logoUrl: data.logoUrl || null,
           sklNumberFormat: data.sklNumberFormat || 'B.{seq}/MI.BH/{year}',
+          sknrNumberFormat: data.sknrNumberFormat || 'B.{seq}/SKNR/MI.BH/{year}',
         });
         if (data.logoUrl) {
           setPreviewUrl(data.logoUrl);
@@ -103,6 +106,7 @@ export default function SchoolProfilePage() {
       formData.append('headmasterNip', profile.headmasterNip);
       formData.append('city', profile.city);
       formData.append('sklNumberFormat', profile.sklNumberFormat);
+      formData.append('sknrNumberFormat', profile.sknrNumberFormat);
       
       if (logoFile) {
         formData.append('logo', logoFile);
@@ -126,6 +130,11 @@ export default function SchoolProfilePage() {
 
   // Preview of the SKL number format
   const sklPreview = (profile.sklNumberFormat || '')
+    .replace('{seq}', '001')
+    .replace('{year}', String(new Date().getFullYear()));
+
+  // Preview of the SKNR number format
+  const sknrPreview = (profile.sknrNumberFormat || '')
     .replace('{seq}', '001')
     .replace('{year}', String(new Date().getFullYear()));
 
@@ -287,6 +296,37 @@ export default function SchoolProfilePage() {
                       <span className="text-[11px] text-slate-500">Preview:</span>
                       <span className="font-mono text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-lg">
                         {sklPreview}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* SKNR Number Format */}
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Hash className="w-3 h-3 text-teal-400" />
+                    Format Nomor SKNR
+                  </label>
+                  <input
+                    type="text"
+                    value={profile.sknrNumberFormat}
+                    onChange={(e) => setProfile({ ...profile, sknrNumberFormat: e.target.value })}
+                    disabled={!isAdmin}
+                    placeholder="Contoh: B.{seq}/SKNR/MI.BH/{year}"
+                    className="block w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm font-mono text-slate-200 focus:outline-none focus:border-teal-500/50 transition-colors disabled:opacity-50"
+                  />
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]">
+                    <span className="text-slate-500">Variabel:</span>
+                    <code className="bg-slate-800 text-teal-400 px-2 py-0.5 rounded font-mono">{'{seq}'}</code>
+                    <span className="text-slate-600">= nomor urut (001, 002, ...)</span>
+                    <code className="bg-slate-800 text-teal-400 px-2 py-0.5 rounded font-mono">{'{year}'}</code>
+                    <span className="text-slate-600">= tahun (misal: {new Date().getFullYear()})</span>
+                  </div>
+                  {sknrPreview && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-[11px] text-slate-500">Preview:</span>
+                      <span className="font-mono text-sm text-teal-400 bg-teal-500/10 border border-teal-500/20 px-3 py-1 rounded-lg">
+                        {sknrPreview}
                       </span>
                     </div>
                   )}

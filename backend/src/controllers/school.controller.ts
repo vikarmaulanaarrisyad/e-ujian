@@ -38,7 +38,7 @@ export const getSchoolProfile = async (req: Request, res: Response, next: NextFu
 
 export const updateSchoolProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, npsn, nsm, address, district, province, headmaster, headmasterNip, city, sklNumberFormat } = req.body;
+    const { name, npsn, nsm, address, district, province, headmaster, headmasterNip, city, sklNumberFormat, sknrNumberFormat } = req.body;
     let profile = await prisma.schoolProfile.findFirst();
 
     let logoUrl = profile?.logoUrl;
@@ -63,6 +63,7 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
           headmasterNip: headmasterNip || profile.headmasterNip,
           logoUrl,
           sklNumberFormat: sklNumberFormat !== undefined ? (sklNumberFormat || null) : profile.sklNumberFormat,
+          sknrNumberFormat: sknrNumberFormat !== undefined ? (sknrNumberFormat || null) : profile.sknrNumberFormat,
         },
       });
     } else {
@@ -79,6 +80,7 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
           headmasterNip: headmasterNip || DEFAULT_SCHOOL.headmasterNip,
           logoUrl,
           sklNumberFormat: sklNumberFormat || null,
+          sknrNumberFormat: sknrNumberFormat || null,
         },
       });
     }

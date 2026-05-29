@@ -33,6 +33,8 @@ import {
 } from '@tanstack/react-table';
 import BatchSklDownloader from '@/components/BatchSklDownloader';
 import IndividualSklDownloader from '@/components/IndividualSklDownloader';
+import IndividualSknrDownloader from '@/components/IndividualSknrDownloader';
+import IndividualIjazahDownloader from '@/components/IndividualIjazahDownloader';
 
 interface Student {
   id: string;
@@ -43,6 +45,7 @@ interface Student {
   graduationDate: string | null;
   certificateNumber: string | null;
   sklNumber: string | null;
+  sknrNumber: string | null;
 }
 
 export default function GraduationPage() {
@@ -70,6 +73,11 @@ export default function GraduationPage() {
   const [assignSklModalOpen, setAssignSklModalOpen] = useState(false);
   const [sklFormat, setSklFormat] = useState('');
   const [overwriteSkl, setOverwriteSkl] = useState(false);
+
+  // Assign SKNR modal state
+  const [assignSknrModalOpen, setAssignSknrModalOpen] = useState(false);
+  const [sknrFormat, setSknrFormat] = useState('');
+  const [overwriteSknr, setOverwriteSknr] = useState(false);
   
   // Archive modal state
   const [archiveModalOpen, setArchiveModalOpen] = useState(false);
@@ -90,6 +98,9 @@ export default function GraduationPage() {
       const res = await api.get('/school');
       if (res.data.sklNumberFormat) {
         setSklFormat(res.data.sklNumberFormat);
+      }
+      if (res.data.sknrNumberFormat) {
+        setSknrFormat(res.data.sknrNumberFormat);
       }
       return res.data;
     },
@@ -180,7 +191,28 @@ export default function GraduationPage() {
     },
   });
 
+  // Assign SKNR Numbers Mutation
+  const assignSknrMutation = useMutation({
+    mutationFn: async (payload: { format: string; overwrite: boolean }) => {
+      return await api.post('/students/graduation/assign-sknr-numbers', payload);
+    },
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      const { assigned, preview } = res.data;
+      const previewText = preview?.length ? ` (contoh: ${preview.join(', ')})` : '';
+      showToast(`Berhasil assign ${assigned} nomor SKNR${previewText}.`, 'success');
+      setAssignSknrModalOpen(false);
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || 'Gagal assign nomor SKNR.', 'error');
+    },
+  });
+
   const sklPreview = sklFormat
+    .replace('{seq}', '001')
+    .replace('{year}', String(new Date().getFullYear()));
+
+  const sknrPreview = sknrFormat
     .replace('{seq}', '001')
     .replace('{year}', String(new Date().getFullYear()));
 
@@ -225,6 +257,16 @@ export default function GraduationPage() {
         },
       },
       {
+        accessorKey: 'sknrNumber',
+        header: 'No. SKNR',
+        cell: (info) => {
+          const val = info.getValue() as string;
+          return val
+            ? <span className="font-mono text-[11px] text-teal-300 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20">{val}</span>
+            : <span className="text-slate-600 text-[11px]">—</span>;
+        },
+      },
+      {
         accessorKey: 'graduationDate',
         header: 'Tgl Lulus',
         cell: (info) => {
@@ -258,16 +300,9 @@ export default function GraduationPage() {
               
               {student.isGraduated && (
                 <>
+                  <IndividualSknrDownloader studentId={student.id} />
                   <IndividualSklDownloader studentId={student.id} />
-                  <a
-                    href={`/dashboard/students/graduation/print-ijazah/${student.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    title="Cetak Ijazah"
-                    className="p-1.5 text-slate-450 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors"
-                  >
-                    <Printer className="w-4 h-4" />
-                  </a>
+                  <IndividualIjazahDownloader studentId={student.id} />
                 </>
               )}
             </div>
@@ -348,6 +383,14 @@ export default function GraduationPage() {
     assignSklMutation.mutate({ format: sklFormat, overwrite: overwriteSkl });
   };
 
+  const handleAssignSknr = () => {
+    if (!sknrFormat.trim()) {
+      showToast('Masukkan format nomor SKNR terlebih dahulu.', 'error');
+      return;
+    }
+    assignSknrMutation.mutate({ format: sknrFormat, overwrite: overwriteSknr });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -366,6 +409,15 @@ export default function GraduationPage() {
               >
                 <Hash className="w-4 h-4" />
                 Assign Nomor SKL
+              </button>
+
+              {/* Assign SKNR Numbers */}
+              <button
+                onClick={() => setAssignSknrModalOpen(true)}
+                className="px-4 py-2.5 bg-teal-700 hover:bg-teal-600 active:bg-teal-800 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-teal-600/10"
+              >
+                <Hash className="w-4 h-4" />
+                Assign Nomor SKNR
               </button>
 
               {/* Batch Print SKL (Direct Download) */}
@@ -628,9 +680,9 @@ export default function GraduationPage() {
       {/* Assign SKL Numbers Modal */}
       {assignSklModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-lg bg-slate-900 border border-teal-900/50 rounded-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-teal-950/20">
-              <div className="flex items-center gap-2 text-teal-400">
+          <div className="w-full max-w-lg bg-slate-900 border border-emerald-900/50 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-emerald-950/20">
+              <div className="flex items-center gap-2 text-emerald-400">
                 <Hash className="w-5 h-5" />
                 <h3 className="font-bold text-sm">Assign Nomor SKL Otomatis</h3>
               </div>
@@ -640,7 +692,7 @@ export default function GraduationPage() {
             </div>
 
             <div className="p-6 space-y-5 text-xs text-slate-300">
-              <div className="p-4 rounded-xl bg-teal-500/5 border border-teal-500/20 text-teal-300 text-[11px] leading-relaxed">
+              <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-emerald-300 text-[11px] leading-relaxed">
                 Sistem akan meng-assign nomor SKL secara berurutan ke semua siswa yang berstatus <strong>LULUS</strong>, diurutkan berdasarkan nama.
               </div>
 
@@ -651,18 +703,18 @@ export default function GraduationPage() {
                   value={sklFormat}
                   onChange={(e) => setSklFormat(e.target.value)}
                   placeholder="B.{seq}/MI.BH/{year}"
-                  className="block w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-slate-200 focus:outline-none focus:border-teal-500/50 transition-colors"
+                  className="block w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-slate-200 focus:outline-none focus:border-emerald-500/50 transition-colors"
                 />
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-                  <code className="bg-slate-800 text-teal-400 px-2 py-0.5 rounded font-mono">{'{seq}'}</code>
+                  <code className="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded font-mono">{'{seq}'}</code>
                   <span className="text-slate-500">= nomor urut 3 digit</span>
-                  <code className="bg-slate-800 text-teal-400 px-2 py-0.5 rounded font-mono ml-2">{'{year}'}</code>
+                  <code className="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded font-mono ml-2">{'{year}'}</code>
                   <span className="text-slate-500">= tahun kelulusan</span>
                 </div>
                 {sklPreview && (
                   <div className="mt-2 flex items-center gap-2">
                     <span className="text-slate-500 text-[11px]">Preview:</span>
-                    <span className="font-mono text-sm text-teal-400 bg-teal-500/10 border border-teal-500/20 px-3 py-1 rounded-lg">{sklPreview}</span>
+                    <span className="font-mono text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-lg">{sklPreview}</span>
                   </div>
                 )}
               </div>
@@ -676,7 +728,7 @@ export default function GraduationPage() {
                       onChange={(e) => setOverwriteSkl(e.target.checked)}
                       className="sr-only"
                     />
-                    <div className={`w-10 h-5 rounded-full transition-colors ${overwriteSkl ? 'bg-teal-500' : 'bg-slate-700'}`} />
+                    <div className={`w-10 h-5 rounded-full transition-colors ${overwriteSkl ? 'bg-emerald-500' : 'bg-slate-700'}`} />
                     <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${overwriteSkl ? 'translate-x-5' : 'translate-x-0'}`} />
                   </div>
                   <div>
@@ -696,11 +748,95 @@ export default function GraduationPage() {
                 <button
                   onClick={handleAssignSkl}
                   disabled={assignSklMutation.isPending || !sklFormat.trim()}
-                  className="flex-1 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+                  className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
                 >
                   {assignSklMutation.isPending
                     ? <><RefreshCw className="w-4 h-4 animate-spin" /> Memproses...</>
                     : <><Hash className="w-4 h-4" /> Assign Nomor SKL</>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign SKNR Numbers Modal */}
+      {assignSknrModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-slate-900 border border-teal-900/50 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-teal-950/20">
+              <div className="flex items-center gap-2 text-teal-400">
+                <Hash className="w-5 h-5" />
+                <h3 className="font-bold text-sm">Assign Nomor SKNR Otomatis</h3>
+              </div>
+              <button onClick={() => setAssignSknrModalOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 text-xs text-slate-300">
+              <div className="p-4 rounded-xl bg-teal-500/5 border border-teal-500/20 text-teal-300 text-[11px] leading-relaxed">
+                Sistem akan meng-assign nomor SKNR secara berurutan ke semua siswa yang berstatus <strong>LULUS</strong>, diurutkan berdasarkan nama.
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Format Nomor SKNR</label>
+                <input
+                  type="text"
+                  value={sknrFormat}
+                  onChange={(e) => setSknrFormat(e.target.value)}
+                  placeholder="B.{seq}/SKNR/MI.BH/{year}"
+                  className="block w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-slate-200 focus:outline-none focus:border-teal-500/50 transition-colors"
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                  <code className="bg-slate-800 text-teal-400 px-2 py-0.5 rounded font-mono">{'{seq}'}</code>
+                  <span className="text-slate-500">= nomor urut 3 digit</span>
+                  <code className="bg-slate-800 text-teal-400 px-2 py-0.5 rounded font-mono ml-2">{'{year}'}</code>
+                  <span className="text-slate-500">= tahun kelulusan</span>
+                </div>
+                {sknrPreview && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-slate-500 text-[11px]">Preview:</span>
+                    <span className="font-mono text-sm text-teal-400 bg-teal-500/10 border border-teal-500/20 px-3 py-1 rounded-lg">{sknrPreview}</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={overwriteSknr}
+                      onChange={(e) => setOverwriteSknr(e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div className={`w-10 h-5 rounded-full transition-colors ${overwriteSknr ? 'bg-teal-500' : 'bg-slate-700'}`} />
+                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${overwriteSknr ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-300">Timpa nomor yang sudah ada</p>
+                    <p className="text-[10px] text-slate-500">Jika diaktifkan, semua nomor SKNR akan di-assign ulang dari urutan 001</p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-amber-400 text-[11px] flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>Siswa yang sudah memiliki nomor SKNR tidak akan diubah kecuali opsi "Timpa" diaktifkan.</span>
+              </div>
+
+              <div className="flex gap-3 pt-2 border-t border-slate-800/60">
+                <button type="button" onClick={() => setAssignSknrModalOpen(false)} className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold">Batal</button>
+                <button
+                  onClick={handleAssignSknr}
+                  disabled={assignSknrMutation.isPending || !sknrFormat.trim()}
+                  className="flex-1 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+                >
+                  {assignSknrMutation.isPending
+                    ? <><RefreshCw className="w-4 h-4 animate-spin" /> Memproses...</>
+                    : <><Hash className="w-4 h-4" /> Assign Nomor SKNR</>
                   }
                 </button>
               </div>

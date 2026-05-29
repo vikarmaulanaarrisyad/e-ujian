@@ -39,3 +39,4 @@ app.listen(env.PORT, () => {
   console.log(`🚀 Server is running in ${env.NODE_ENV} mode on port ${env.PORT}`);
   console.log(`👉 Base URL: http://localhost:${env.PORT}`);
 });
+

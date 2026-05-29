@@ -600,6 +600,81 @@ export const batchAssignSklNumbers = async (req: Request, res: Response, next: N
   }
 };
 
+// Batch assign SKNR numbers to all graduated students
+export const batchAssignSknrNumbers = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    const { format, overwrite } = req.body;
+
+    const profile = await prisma.schoolProfile.findUnique({ where: { tenantId } });
+    const numberFormat = format || profile?.sknrNumberFormat || 'B.{seq}/SKNR/MI.BH/{year}';
+
+    const students = await prisma.student.findMany({
+      where: { isGraduated: true, tenantId },
+      orderBy: { name: 'asc' },
+    });
+
+    if (students.length === 0) {
+      return res.status(400).json({ message: 'Tidak ada siswa yang berstatus lulus.' });
+    }
+
+    const toAssign = overwrite
+      ? students
+      : students.filter(s => !s.sknrNumber);
+
+    if (toAssign.length === 0) {
+      return res.status(200).json({ 
+        message: 'Semua siswa lulus sudah memiliki nomor SKNR. Gunakan opsi "Timpa" untuk meng-assign ulang.',
+        assigned: 0,
+      });
+    }
+
+    let seqCounter = 1;
+    const updates: { id: string; sknrNumber: string }[] = [];
+
+    for (const student of toAssign) {
+      const year = student.graduationDate
+        ? new Date(student.graduationDate).getFullYear()
+        : new Date().getFullYear();
+      const seq = String(seqCounter).padStart(3, '0');
+      const sknrNumber = numberFormat
+        .replace('{seq}', seq)
+        .replace('{year}', String(year));
+
+      updates.push({ id: student.id, sknrNumber });
+      seqCounter++;
+    }
+
+    await prisma.$transaction(
+      updates.map(u =>
+        (prisma.student.update as any)({
+          where: { id: u.id },
+          data: { sknrNumber: u.sknrNumber },
+        })
+      )
+    );
+
+    logActivity({ req, action: 'ASSIGN_SKNR_NUMBERS', entity: 'Student', description: `Meng-assign ${updates.length} nomor SKNR dengan format: ${numberFormat}`, metadata: { assigned: updates.length, format: numberFormat } });
+
+    // Update School Profile format default if not present
+    if (!profile?.sknrNumberFormat) {
+       await (prisma.schoolProfile.update as any)({
+         where: { tenantId },
+         data: { sknrNumberFormat: numberFormat }
+       });
+    }
+
+    return res.status(200).json({
+      message: `Berhasil meng-assign ${updates.length} nomor SKNR.`,
+      assigned: updates.length,
+      format: numberFormat,
+      preview: updates.slice(0, 3).map(u => u.sknrNumber),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Upload photos via ZIP
 export const uploadPhotos = async (req: Request, res: Response, next: NextFunction) => {
   try {

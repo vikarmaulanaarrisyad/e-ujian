@@ -1304,6 +1304,235 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
   }
 };
 
+// ==========================================
+// SUMMARY TKA AND UM
+// ==========================================
+
+export const getGradeSummary = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    
+    const activeYear = await getActiveYear(tenantId);
+    if (!activeYear) {
+      return res.status(200).json({ 
+        academicYear: null,
+        summary: [],
+        schoolProfile: null,
+      });
+    }
+
+    let profile: any = await prisma.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } });
+    if (!profile) {
+      profile = { name: 'MI Bustanul Huda', city: 'Kota' };
+    }
+    if (profile.logoUrl && !profile.logoUrl.startsWith('http')) {
+      const host = req.get('host');
+      const protocol = req.protocol;
+      profile.logoUrl = `${protocol}://${host}${profile.logoUrl}`;
+    }
+
+    const students = await prisma.student.findMany({
+      where: { tenantId, isAlumni: false },
+      orderBy: { name: 'asc' },
+      include: {
+        tkaGrades: {
+          where: { academicYearId: activeYear.id },
+        },
+        examGrades: {
+          where: { academicYearId: activeYear.id },
+        },
+      },
+    });
+
+    const summary = students.map((student) => {
+      let tkaTotal = 0;
+      let tkaCount = 0;
+      student.tkaGrades.forEach(tka => {
+        tkaTotal += tka.score;
+        tkaCount++;
+      });
+      const tkaAverage = tkaCount > 0 ? tkaTotal / tkaCount : 0;
+
+      let examTotal = 0;
+      let examCount = 0;
+      student.examGrades.forEach(exam => {
+        examTotal += exam.score;
+        examCount++;
+      });
+      const examAverage = examCount > 0 ? examTotal / examCount : 0;
+
+      return {
+        studentId: student.id,
+        nis: student.nis,
+        nisn: student.nisn,
+        studentName: student.name,
+        gender: student.gender,
+        tkaAverage: Number(tkaAverage.toFixed(2)),
+        examAverage: Number(examAverage.toFixed(2)),
+        examAverageRounded: Math.round(examAverage),
+      };
+    });
+
+    summary.sort((a, b) => {
+      return a.studentName.localeCompare(b.studentName);
+    });
+
+    return res.status(200).json({
+      academicYear: {
+        id: activeYear.id,
+        year: activeYear.year,
+        semester: activeYear.semester,
+      },
+      summary: summary,
+      schoolProfile: profile,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const exportGradeSummary = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    
+    const activeYear = await getActiveYear(tenantId);
+    if (!activeYear) {
+      return res.status(404).json({ message: 'No active academic year found' });
+    }
+
+    const students = await prisma.student.findMany({
+      where: { tenantId, isAlumni: false },
+      orderBy: { name: 'asc' },
+      include: {
+        tkaGrades: {
+          where: { academicYearId: activeYear.id },
+        },
+        examGrades: {
+          where: { academicYearId: activeYear.id },
+        },
+      },
+    });
+
+    const summaryRaw = students.map((student) => {
+      let tkaTotal = 0;
+      let tkaCount = 0;
+      student.tkaGrades.forEach(tka => {
+        tkaTotal += tka.score;
+        tkaCount++;
+      });
+      const tkaAverage = tkaCount > 0 ? tkaTotal / tkaCount : 0;
+
+      let examTotal = 0;
+      let examCount = 0;
+      student.examGrades.forEach(exam => {
+        examTotal += exam.score;
+        examCount++;
+      });
+      const examAverage = examCount > 0 ? examTotal / examCount : 0;
+
+      return {
+        nis: student.nis,
+        nisn: student.nisn,
+        studentName: student.name,
+        gender: student.gender,
+        tkaAverage,
+        examAverage,
+        examAverageRounded: Math.round(examAverage),
+      };
+    });
+
+    summaryRaw.sort((a, b) => {
+      return a.studentName.localeCompare(b.studentName);
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Summary TKA & UM');
+
+    worksheet.views = [
+      { state: 'frozen', xSplit: 3, ySplit: 1 }
+    ];
+
+    worksheet.columns = [
+      { key: 'nis', width: 15 },
+      { key: 'nisn', width: 15 },
+      { key: 'name', width: 30 },
+      { key: 'gender', width: 8 },
+      { key: 'tka', width: 15 },
+      { key: 'um', width: 15 },
+      { key: 'um_round', width: 15 },
+    ];
+
+    const row1 = worksheet.getRow(1);
+    row1.height = 30;
+
+    row1.getCell(1).value = 'NIS';
+    row1.getCell(2).value = 'NISN';
+    row1.getCell(3).value = 'Nama Lengkap';
+    row1.getCell(4).value = 'L/P';
+    row1.getCell(5).value = 'Rata-rata TKA';
+    row1.getCell(6).value = 'Rata-rata UM';
+    row1.getCell(7).value = 'Rata-rata UM (Bulat)';
+
+    const headerBorder: Partial<ExcelJS.Borders> = {
+      top: { style: 'thin', color: { argb: 'A0A0A0' } },
+      left: { style: 'thin', color: { argb: 'A0A0A0' } },
+      bottom: { style: 'thin', color: { argb: 'A0A0A0' } },
+      right: { style: 'thin', color: { argb: 'A0A0A0' } }
+    };
+
+    for (let c = 1; c <= 7; c++) {
+      const cell = row1.getCell(c);
+      cell.font = { bold: true, color: { argb: 'FFFFFF' }, name: 'Arial', size: 11 };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: '0E7490' } // Cyan 700
+      };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = headerBorder;
+    }
+    row1.getCell(3).alignment = { horizontal: 'left', vertical: 'middle' };
+
+    summaryRaw.forEach((student) => {
+      const newRow = worksheet.addRow({
+        nis: student.nis,
+        nisn: student.nisn,
+        name: student.studentName,
+        gender: student.gender,
+        tka: student.tkaAverage !== 0 ? Number(student.tkaAverage.toFixed(2)) : '',
+        um: student.examAverage !== 0 ? Number(student.examAverage.toFixed(2)) : '',
+        um_round: student.examAverageRounded !== 0 ? student.examAverageRounded : '',
+      });
+      newRow.height = 20;
+
+      newRow.eachCell((cell, colNumber) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'D9D9D9' } },
+          left: { style: 'thin', color: { argb: 'D9D9D9' } },
+          bottom: { style: 'thin', color: { argb: 'D9D9D9' } },
+          right: { style: 'thin', color: { argb: 'D9D9D9' } }
+        };
+
+        if (colNumber === 3) {
+          cell.alignment = { vertical: 'middle' };
+        } else {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        }
+      });
+    });
+
+    const fileName = `summary_tka_um_${activeYear.year.replace('/', '_')}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 // Get list of all subjects
 export const getMissingGrades = async (req: Request, res: Response, next: NextFunction) => {
   try {
