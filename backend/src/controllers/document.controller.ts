@@ -319,6 +319,7 @@ export const getStudentSknrData = async (req: Request, res: Response, next: Next
         graduationDate: student.graduationDate,
         certificateNumber: student.certificateNumber,
         sklNumber: student.sklNumber,
+        sknrNumber: student.sknrNumber,
       },
       schoolProfile: profile,
       sknrDetails: {
