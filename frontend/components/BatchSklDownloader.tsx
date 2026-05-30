@@ -150,7 +150,7 @@ export default function BatchSklDownloader({ withTranscript = false, className }
               .ttd-wrap { margin-top: auto; padding-top: 20px; display: flex; justify-content: flex-end; }
               .ttd-block { text-align: center; width: 250px; font-size: 15px; line-height: 1.6; }
               .ttd-space { height: 80px; }
-              .ttd-name { font-weight: bold; text-decoration: underline; text-transform: uppercase; letter-spacing: 0.5px; }
+              .ttd-name { font-weight: bold; text-decoration: underline; letter-spacing: 0.5px; }
             `}} />
             
             {batchData.students.map((student: any) => {
@@ -202,7 +202,6 @@ export default function BatchSklDownloader({ withTranscript = false, className }
                             ['Nama Lengkap',              <strong key="n" style={{ textTransform: 'uppercase' }}>{student.name}</strong>],
                             ['Tempat, Tanggal Lahir',     `${student.placeOfBirth || '-'}, ${formatDate(student.dateOfBirth)}`],
                             ['Nama Orang Tua / Wali',     student.parentName || '-'],
-                            ['Nomor Induk Siswa (NIS)',   student.nis],
                             ['Nomor Induk Siswa Nasional (NISN)', student.nisn],
                           ] as [string, React.ReactNode][]).map(([label, value], i) => (
                             <tr key={i}>

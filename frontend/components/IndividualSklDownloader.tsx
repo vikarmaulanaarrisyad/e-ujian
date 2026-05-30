@@ -140,7 +140,7 @@ export default function IndividualSklDownloader({ studentId, withTranscript = fa
               .ttd-wrap { margin-top: auto; padding-top: 20px; display: flex; justify-content: flex-end; }
               .ttd-block { text-align: center; width: 250px; font-size: 15px; line-height: 1.6; }
               .ttd-space { height: 80px; }
-              .ttd-name { font-weight: bold; text-decoration: underline; text-transform: uppercase; letter-spacing: 0.5px; }
+              .ttd-name { font-weight: bold; text-decoration: underline; letter-spacing: 0.5px; }
             `}} />
             
             <div className="skl-page">

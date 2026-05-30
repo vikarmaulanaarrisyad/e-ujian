@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStudentSknrData = exports.getAllGraduatedSklData = exports.getStudentDocumentData = void 0;
+exports.getBatchTkaStatementData = exports.getStudentSknrData = exports.getAllGraduatedSklData = exports.getStudentDocumentData = void 0;
 const db_1 = __importDefault(require("../db"));
 // Helper: build a default school profile object
 const defaultProfile = () => ({
@@ -109,10 +109,13 @@ const getStudentDocumentData = async (req, res, next) => {
         });
         // Calculate total average
         let totalFinalScore = 0;
+        let totalExamScore = 0;
         if (grades.length > 0) {
             totalFinalScore = grades.reduce((acc, curr) => acc + curr.finalScore, 0);
+            totalExamScore = grades.reduce((acc, curr) => acc + curr.examScore, 0);
         }
         const averageFinalScore = grades.length > 0 ? Number((totalFinalScore / grades.length).toFixed(2)) : 0;
+        const averageExamScore = grades.length > 0 ? Number((totalExamScore / grades.length).toFixed(2)) : 0;
         return res.status(200).json({
             student: {
                 id: student.id,
@@ -132,6 +135,7 @@ const getStudentDocumentData = async (req, res, next) => {
             schoolProfile: profile,
             grades,
             averageFinalScore,
+            averageExamScore,
             academicYear: activeYear.year,
         });
     }
@@ -158,27 +162,55 @@ const getAllGraduatedSklData = async (req, res, next) => {
         // Fetch all graduated students ordered by sklNumber then name
         const students = await db_1.default.student.findMany({
             where: { isGraduated: true, tenantId },
+            include: {
+                examGrades: {
+                    where: { academicYearId: activeYear.id },
+                }
+            },
             orderBy: [{ sklNumber: 'asc' }, { name: 'asc' }],
         });
         if (students.length === 0) {
             return res.status(404).json({ message: 'Tidak ada siswa yang berstatus lulus.' });
         }
+        // Fetch all subjects to build the transcript table
+        const subjects = await db_1.default.subject.findMany({
+            where: { tenantId },
+            orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
+        });
         return res.status(200).json({
-            students: students.map((s) => ({
-                id: s.id,
-                nis: s.nis,
-                nisn: s.nisn,
-                name: s.name,
-                gender: s.gender,
-                placeOfBirth: s.placeOfBirth,
-                dateOfBirth: s.dateOfBirth,
-                parentName: s.parentName,
-                isGraduated: s.isGraduated,
-                graduationDate: s.graduationDate,
-                certificateNumber: s.certificateNumber,
-                sklNumber: s.sklNumber,
-                photoUrl: s.photoUrl,
-            })),
+            students: students.map((s) => {
+                // Map exam scores for this student
+                const examGradesBySubject = {};
+                s.examGrades.forEach((eg) => {
+                    examGradesBySubject[eg.subjectId] = eg.score;
+                });
+                const grades = subjects.map((subject) => ({
+                    subjectId: subject.id,
+                    subjectName: subject.name,
+                    subjectGroup: subject.group,
+                    examScore: Number((examGradesBySubject[subject.id] || 0).toFixed(2)),
+                }));
+                const validGrades = grades.filter(g => g.examScore > 0);
+                const totalExamScore = validGrades.reduce((acc, curr) => acc + curr.examScore, 0);
+                const averageExamScore = validGrades.length > 0 ? Number((totalExamScore / validGrades.length).toFixed(2)) : 0;
+                return {
+                    id: s.id,
+                    nis: s.nis,
+                    nisn: s.nisn,
+                    name: s.name,
+                    gender: s.gender,
+                    placeOfBirth: s.placeOfBirth,
+                    dateOfBirth: s.dateOfBirth,
+                    parentName: s.parentName,
+                    isGraduated: s.isGraduated,
+                    graduationDate: s.graduationDate,
+                    certificateNumber: s.certificateNumber,
+                    sklNumber: s.sklNumber,
+                    photoUrl: s.photoUrl,
+                    grades,
+                    averageExamScore,
+                };
+            }),
             schoolProfile: profile,
             academicYear: activeYear.year,
         });
@@ -303,3 +335,57 @@ const getStudentSknrData = async (req, res, next) => {
     }
 };
 exports.getStudentSknrData = getStudentSknrData;
+const getBatchTkaStatementData = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const activeYear = await db_1.default.academicYear.findFirst({
+            where: { isActive: true, tenantId },
+            include: { gradeWeights: true },
+        });
+        if (!activeYear) {
+            return res.status(404).json({ message: 'Tidak ada tahun ajaran aktif.' });
+        }
+        let profile = await db_1.default.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
+        profile = resolveLogoUrl({ ...profile }, req);
+        const students = await db_1.default.student.findMany({
+            where: { tenantId, isGraduated: true },
+            include: {
+                tkaGrades: {
+                    where: { academicYearId: activeYear.id },
+                }
+            },
+            orderBy: { name: 'asc' },
+        });
+        if (students.length === 0) {
+            return res.status(404).json({ message: 'Tidak ada siswa lulus.' });
+        }
+        return res.status(200).json({
+            students: students.map((s) => {
+                let mathScore = 0;
+                let indoScore = 0;
+                s.tkaGrades.forEach((grade) => {
+                    if (grade.subjectType === 'MATEMATIKA')
+                        mathScore = grade.score;
+                    if (grade.subjectType === 'BAHASA_INDONESIA')
+                        indoScore = grade.score;
+                });
+                return {
+                    id: s.id,
+                    nis: s.nis,
+                    nisn: s.nisn,
+                    name: s.name,
+                    placeOfBirth: s.placeOfBirth,
+                    dateOfBirth: s.dateOfBirth,
+                    mathScore,
+                    indoScore,
+                };
+            }),
+            schoolProfile: profile,
+            academicYear: activeYear.year,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.getBatchTkaStatementData = getBatchTkaStatementData;

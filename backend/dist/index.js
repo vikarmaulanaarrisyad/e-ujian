@@ -35,4 +35,5 @@ app.use(error_middleware_1.errorHandler);
 app.listen(env_1.env.PORT, () => {
     console.log(`🚀 Server is running in ${env_1.env.NODE_ENV} mode on port ${env_1.env.PORT}`);
     console.log(`👉 Base URL: http://localhost:${env_1.env.PORT}`);
+    console.log('TKA Batch route should be loaded now');
 });

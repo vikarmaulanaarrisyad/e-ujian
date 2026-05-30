@@ -1331,6 +1331,18 @@ export const getGradeSummary = async (req: Request, res: Response, next: NextFun
       profile.logoUrl = `${protocol}://${host}${profile.logoUrl}`;
     }
 
+    const subjects = await prisma.subject.findMany({
+      where: { tenantId },
+      orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
+    });
+
+    const tkaSubjectTypes = await prisma.tkaGrade.findMany({
+      where: { academicYearId: activeYear.id, tenantId },
+      select: { subjectType: true },
+      distinct: ['subjectType'],
+    });
+    const tkaSubjects = tkaSubjectTypes.map(t => t.subjectType).sort();
+
     const students = await prisma.student.findMany({
       where: { tenantId, isAlumni: false },
       orderBy: { name: 'asc' },
@@ -1340,6 +1352,7 @@ export const getGradeSummary = async (req: Request, res: Response, next: NextFun
         },
         examGrades: {
           where: { academicYearId: activeYear.id },
+          include: { subject: true },
         },
       },
     });
@@ -1347,17 +1360,21 @@ export const getGradeSummary = async (req: Request, res: Response, next: NextFun
     const summary = students.map((student) => {
       let tkaTotal = 0;
       let tkaCount = 0;
+      const tkaScores: Record<string, number> = {};
       student.tkaGrades.forEach(tka => {
         tkaTotal += tka.score;
         tkaCount++;
+        tkaScores[tka.subjectType] = tka.score;
       });
       const tkaAverage = tkaCount > 0 ? tkaTotal / tkaCount : 0;
 
       let examTotal = 0;
       let examCount = 0;
+      const subjectScores: Record<string, number> = {};
       student.examGrades.forEach(exam => {
         examTotal += exam.score;
         examCount++;
+        subjectScores[exam.subjectId] = exam.score;
       });
       const examAverage = examCount > 0 ? examTotal / examCount : 0;
 
@@ -1367,9 +1384,13 @@ export const getGradeSummary = async (req: Request, res: Response, next: NextFun
         nisn: student.nisn,
         studentName: student.name,
         gender: student.gender,
+        tkaTotal,
+        tkaScores,
         tkaAverage: Number(tkaAverage.toFixed(2)),
+        examTotal,
         examAverage: Number(examAverage.toFixed(2)),
         examAverageRounded: Math.round(examAverage),
+        subjectScores,
       };
     });
 
@@ -1384,6 +1405,8 @@ export const getGradeSummary = async (req: Request, res: Response, next: NextFun
         semester: activeYear.semester,
       },
       summary: summary,
+      subjects: subjects.map(s => ({ id: s.id, name: s.name, code: s.code })),
+      tkaSubjects,
       schoolProfile: profile,
     });
   } catch (error) {
@@ -1401,6 +1424,18 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
       return res.status(404).json({ message: 'No active academic year found' });
     }
 
+    const subjects = await prisma.subject.findMany({
+      where: { tenantId },
+      orderBy: [{ group: 'asc' }, { order: 'asc' }, { name: 'asc' }],
+    });
+
+    const tkaSubjectTypes = await prisma.tkaGrade.findMany({
+      where: { academicYearId: activeYear.id, tenantId },
+      select: { subjectType: true },
+      distinct: ['subjectType'],
+    });
+    const tkaSubjects = tkaSubjectTypes.map(t => t.subjectType).sort();
+
     const students = await prisma.student.findMany({
       where: { tenantId, isAlumni: false },
       orderBy: { name: 'asc' },
@@ -1410,6 +1445,7 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
         },
         examGrades: {
           where: { academicYearId: activeYear.id },
+          include: { subject: true },
         },
       },
     });
@@ -1417,17 +1453,21 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
     const summaryRaw = students.map((student) => {
       let tkaTotal = 0;
       let tkaCount = 0;
+      const tkaScores: Record<string, number> = {};
       student.tkaGrades.forEach(tka => {
         tkaTotal += tka.score;
         tkaCount++;
+        tkaScores[tka.subjectType] = tka.score;
       });
       const tkaAverage = tkaCount > 0 ? tkaTotal / tkaCount : 0;
 
       let examTotal = 0;
       let examCount = 0;
+      const subjectScores: Record<string, number> = {};
       student.examGrades.forEach(exam => {
         examTotal += exam.score;
         examCount++;
+        subjectScores[exam.subjectId] = exam.score;
       });
       const examAverage = examCount > 0 ? examTotal / examCount : 0;
 
@@ -1436,9 +1476,13 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
         nisn: student.nisn,
         studentName: student.name,
         gender: student.gender,
+        tkaTotal,
+        tkaScores,
         tkaAverage,
+        examTotal,
         examAverage,
         examAverageRounded: Math.round(examAverage),
+        subjectScores,
       };
     });
 
@@ -1451,25 +1495,36 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
     }
 
     const workbook = new ExcelJS.Workbook();
-    const sheetName = ranking === 'UM' ? 'Ranking UM' : 'Summary TKA & UM';
+    const sheetName = ranking === 'UM' ? 'Ranking UM' : (ranking === 'UM_SUMMARY' ? 'Summary UM' : 'Summary TKA & UM');
     const worksheet = workbook.addWorksheet(sheetName);
 
     worksheet.views = [
       { state: 'frozen', xSplit: 3, ySplit: 1 }
     ];
 
-    const columns = [
+    const columns: any[] = [
       { key: 'nis', width: 15 },
       { key: 'nisn', width: 15 },
       { key: 'name', width: 30 },
       { key: 'gender', width: 8 },
-      { key: 'tka', width: 15 },
-      { key: 'um', width: 15 },
-      { key: 'um_round', width: 15 },
     ];
 
-    if (ranking === 'UM') {
-      columns.unshift({ key: 'rank', width: 10 });
+    if (ranking === 'UM' || ranking === 'UM_SUMMARY') {
+      if (ranking === 'UM') {
+        columns.unshift({ key: 'rank', width: 10 });
+      }
+      subjects.forEach((subj) => {
+        columns.push({ key: `sub_${subj.id}`, width: 10 });
+      });
+      columns.push({ key: 'jumlah', width: 12 });
+      columns.push({ key: 'um', width: 15 });
+      columns.push({ key: 'um_round', width: 15 });
+    } else {
+      tkaSubjects.forEach((subjType) => {
+        columns.push({ key: `tka_${subjType}`, width: 15 });
+      });
+      columns.push({ key: 'tka_total', width: 12 });
+      columns.push({ key: 'tka_avg', width: 15 });
     }
 
     worksheet.columns = columns;
@@ -1486,9 +1541,21 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
     row1.getCell(startColIdx++).value = 'NISN';
     row1.getCell(startColIdx++).value = 'Nama Lengkap';
     row1.getCell(startColIdx++).value = 'L/P';
-    row1.getCell(startColIdx++).value = 'Rata-rata TKA';
-    row1.getCell(startColIdx++).value = 'Rata-rata UM';
-    row1.getCell(startColIdx++).value = 'Rata-rata UM (Bulat)';
+    
+    if (ranking === 'UM' || ranking === 'UM_SUMMARY') {
+      subjects.forEach((subj) => {
+        row1.getCell(startColIdx++).value = subj.code;
+      });
+      row1.getCell(startColIdx++).value = 'Jumlah';
+      row1.getCell(startColIdx++).value = 'Rata-rata UM';
+      row1.getCell(startColIdx++).value = 'Rata-rata UM (Bulat)';
+    } else {
+      tkaSubjects.forEach((subjType) => {
+        row1.getCell(startColIdx++).value = subjType.replace(/_/g, ' ');
+      });
+      row1.getCell(startColIdx++).value = 'Jumlah TKA';
+      row1.getCell(startColIdx++).value = 'Rata-rata TKA';
+    }
 
     const headerBorder: Partial<ExcelJS.Borders> = {
       top: { style: 'thin', color: { argb: 'A0A0A0' } },
@@ -1497,7 +1564,7 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
       right: { style: 'thin', color: { argb: 'A0A0A0' } }
     };
 
-    const totalCols = ranking === 'UM' ? 8 : 7;
+    const totalCols = startColIdx - 1;
     for (let c = 1; c <= totalCols; c++) {
       const cell = row1.getCell(c);
       cell.font = { bold: true, color: { argb: 'FFFFFF' }, name: 'Arial', size: 11 };
@@ -1518,13 +1585,25 @@ export const exportGradeSummary = async (req: Request, res: Response, next: Next
         nisn: student.nisn,
         name: student.studentName,
         gender: student.gender,
-        tka: student.tkaAverage !== 0 ? Number(student.tkaAverage.toFixed(2)) : '',
-        um: student.examAverage !== 0 ? Number(student.examAverage.toFixed(2)) : '',
-        um_round: student.examAverageRounded !== 0 ? student.examAverageRounded : '',
       };
       
-      if (ranking === 'UM') {
-        rowData.rank = index + 1;
+      if (ranking === 'UM' || ranking === 'UM_SUMMARY') {
+        if (ranking === 'UM') {
+          rowData.rank = index + 1;
+        }
+        subjects.forEach(subj => {
+          rowData[`sub_${subj.id}`] = student.subjectScores[subj.id] ?? '';
+        });
+        rowData.jumlah = student.examTotal ?? 0;
+        rowData.um = student.examAverage !== 0 ? Number(student.examAverage.toFixed(2)) : '';
+        rowData.um_round = student.examAverageRounded !== 0 ? student.examAverageRounded : '';
+      } else {
+        tkaSubjects.forEach((subjType) => {
+          const score = student.tkaScores[subjType];
+          rowData[`tka_${subjType}`] = score !== undefined ? score.toFixed(2).replace('.', ',') : '';
+        });
+        rowData.tka_total = student.tkaTotal !== undefined ? student.tkaTotal.toFixed(2).replace('.', ',') : '';
+        rowData.tka_avg = student.tkaAverage !== 0 ? student.tkaAverage.toFixed(2).replace('.', ',') : '';
       }
 
       const newRow = worksheet.addRow(rowData);

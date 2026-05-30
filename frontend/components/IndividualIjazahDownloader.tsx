@@ -131,7 +131,7 @@ export default function IndividualIjazahDownloader({ studentId, className }: Ind
               .ttd-box { width: 250px; text-align: left; }
               .ttd-box p { margin: 0; }
               .ttd-space { height: 96px; }
-              .ttd-name { font-weight: bold; text-decoration: underline; text-transform: uppercase; }
+              .ttd-name { font-weight: bold; text-decoration: underline; }
               .cert-number { position: absolute; bottom: 40px; left: 40px; font-size: 10px; color: #6b7280; font-family: sans-serif; }
               .cert-number span { font-weight: bold; color: black; }
             `}} />

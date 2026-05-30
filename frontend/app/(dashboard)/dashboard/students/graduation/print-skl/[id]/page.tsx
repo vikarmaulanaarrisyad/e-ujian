@@ -336,7 +336,6 @@ export default function PrintSKLPage() {
         .ttd-name {
           font-weight: bold;
           text-decoration: underline;
-          text-transform: uppercase;
           letter-spacing: 0.5px;
         }
 
