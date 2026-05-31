@@ -19,6 +19,7 @@ interface SchoolProfile {
   headmasterNip: string;
   city: string;
   logoUrl: string | null;
+  signatureUrl: string | null;
   sklNumberFormat: string;
   sknrNumberFormat: string;
 }
@@ -39,6 +40,7 @@ export default function SchoolProfilePage() {
     headmasterNip: '',
     city: '',
     logoUrl: null,
+    signatureUrl: null,
     sklNumberFormat: 'B.{seq}/MI.BH/{year}',
     sknrNumberFormat: 'B.{seq}/SKNR/MI.BH/{year}',
   });
@@ -47,6 +49,8 @@ export default function SchoolProfilePage() {
   const [saving, setSaving] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  const [previewSignatureUrl, setPreviewSignatureUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -65,11 +69,15 @@ export default function SchoolProfilePage() {
           headmasterNip: data.headmasterNip || '',
           city: data.city || '',
           logoUrl: data.logoUrl || null,
+          signatureUrl: data.signatureUrl || null,
           sklNumberFormat: data.sklNumberFormat || 'B.{seq}/MI.BH/{year}',
           sknrNumberFormat: data.sknrNumberFormat || 'B.{seq}/SKNR/MI.BH/{year}',
         });
         if (data.logoUrl) {
           setPreviewUrl(data.logoUrl);
+        }
+        if (data.signatureUrl) {
+          setPreviewSignatureUrl(data.signatureUrl);
         }
       } catch (error) {
         showToast('Gagal memuat profil madrasah.', 'error');
@@ -89,6 +97,18 @@ export default function SchoolProfilePage() {
       }
       setLogoFile(file);
       setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('Ukuran file maksimal 5MB.', 'error');
+        return;
+      }
+      setSignatureFile(file);
+      setPreviewSignatureUrl(URL.createObjectURL(file));
     }
   };
 
@@ -115,6 +135,9 @@ export default function SchoolProfilePage() {
       if (logoFile) {
         formData.append('logo', logoFile);
       }
+      if (signatureFile) {
+        formData.append('signature', signatureFile);
+      }
 
       const res = await api.put('/school', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -124,6 +147,9 @@ export default function SchoolProfilePage() {
       
       if (res.data.data.logoUrl) {
         setPreviewUrl(res.data.data.logoUrl);
+      }
+      if (res.data.data.signatureUrl) {
+        setPreviewSignatureUrl(res.data.data.signatureUrl);
       }
     } catch (error: any) {
       showToast(error.response?.data?.message || 'Gagal menyimpan profil.', 'error');
@@ -401,7 +427,41 @@ export default function SchoolProfilePage() {
                 <li>Background transparan (PNG) lebih disarankan agar menyatu dengan dokumen cetak.</li>
               </ul>
             </div>
+          </div>
 
+          {/* Signature Upload */}
+          <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md shadow-xl text-center mt-6">
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-6 text-left">Tanda Tangan Kepala Madrasah</h3>
+            
+            <div className="relative group w-48 h-24 mx-auto rounded-xl border-2 border-dashed border-slate-700 bg-slate-950/50 flex flex-col items-center justify-center overflow-hidden mb-6 transition-all hover:border-indigo-500/50">
+              {previewSignatureUrl ? (
+                <div className="relative w-full h-full p-2">
+                  <Image src={previewSignatureUrl} alt="Tanda Tangan" fill className="object-contain p-2" unoptimized />
+                </div>
+              ) : (
+                <>
+                  <ImageIcon className="w-8 h-8 text-slate-600 mb-2" />
+                  <span className="text-[10px] text-slate-500">Belum ada tanda tangan</span>
+                </>
+              )}
+              
+              {isAdmin && (
+                <label className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  <Upload className="w-6 h-6 mb-1" />
+                  <span className="text-[10px] font-bold">Upload Tanda Tangan</span>
+                  <input type="file" className="hidden" accept="image/png, image/jpeg, image/jpg" onChange={handleSignatureChange} />
+                </label>
+              )}
+            </div>
+            
+            <div className="text-xs text-slate-500 text-left space-y-1.5">
+              <p>📌 <strong>Sangat Disarankan:</strong></p>
+              <ul className="list-disc pl-4 space-y-1">
+                <li>Gunakan gambar format <span className="text-slate-300 font-medium">PNG dengan Background Transparan</span>.</li>
+                <li>Hanya gambar tanda tangan tanpa cap stempel (stempel biasanya dicap basah).</li>
+                <li>Crop gambar secukupnya agar tidak terlalu banyak ruang kosong.</li>
+              </ul>
+            </div>
           </div>
         </div>
 

@@ -14,6 +14,7 @@ import {
   batchAssignSknrNumbers,
   uploadPhotos,
   archiveStudents,
+  exportGraduationData,
 } from '../controllers/student.controller';
 import { authenticateJWT } from '../middlewares/auth.middleware';
 import { requireRoles } from '../middlewares/rbac.middleware';
@@ -40,6 +41,7 @@ router.put('/:id', requireRoles(Role.ADMIN, Role.STAFF), updateStudent);
 router.delete('/:id', requireRoles(Role.ADMIN), deleteStudent);
 
 // Graduation routes
+router.get('/graduation/export', requireRoles(Role.ADMIN, Role.STAFF, Role.GURU), exportGraduationData);
 router.patch('/:id/graduation', requireRoles(Role.ADMIN, Role.STAFF), updateGraduationStatus);
 router.post('/graduation/batch', requireRoles(Role.ADMIN, Role.STAFF), batchUpdateGraduation);
 router.post('/graduation/assign-skl-numbers', requireRoles(Role.ADMIN, Role.STAFF), batchAssignSklNumbers);

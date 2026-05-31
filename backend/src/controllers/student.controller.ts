@@ -826,3 +826,49 @@ export const archiveStudents = async (req: Request, res: Response, next: NextFun
     next(error);
   }
 };
+
+// Export graduation data (Name, NISN, SKL, SKNR)
+export const exportGraduationData = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    const students = await prisma.student.findMany({
+      where: { tenantId, isGraduated: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Data Kelulusan');
+
+    worksheet.columns = [
+      { header: 'Nama Siswa', key: 'name', width: 30 },
+      { header: 'NISN', key: 'nisn', width: 20 },
+      { header: 'Nomor SKL', key: 'sklNumber', width: 25 },
+      { header: 'Nomor SKNR', key: 'sknrNumber', width: 25 },
+    ];
+
+    worksheet.getRow(1).font = { bold: true };
+
+    students.forEach((student) => {
+      worksheet.addRow({
+        name: student.name,
+        nisn: student.nisn,
+        sklNumber: student.sklNumber || '-',
+        sknrNumber: student.sknrNumber || '-',
+      });
+    });
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="data_kelulusan.xlsx"'
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    next(error);
+  }
+};

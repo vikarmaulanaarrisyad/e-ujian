@@ -21,6 +21,7 @@ import {
   Hash,
   RefreshCw,
   ClipboardList,
+  Download,
 } from 'lucide-react';
 import {
   useReactTable,
@@ -32,9 +33,13 @@ import {
   SortingState,
 } from '@tanstack/react-table';
 import BatchSklDownloader from '@/components/BatchSklDownloader';
+import BatchInvitationDownloader from '@/components/BatchInvitationDownloader';
 import IndividualSklDownloader from '@/components/IndividualSklDownloader';
 import IndividualSknrDownloader from '@/components/IndividualSknrDownloader';
 import IndividualIjazahDownloader from '@/components/IndividualIjazahDownloader';
+import BatchSkKelulusanDownloader from '@/components/BatchSkKelulusanDownloader';
+import BatchBeritaAcaraDownloader from '@/components/BatchBeritaAcaraDownloader';
+import BatchAttendanceParentsDownloader from '@/components/BatchAttendanceParentsDownloader';
 
 interface Student {
   id: string;
@@ -207,6 +212,23 @@ export default function GraduationPage() {
       showToast(err.response?.data?.message || 'Gagal assign nomor SKNR.', 'error');
     },
   });
+
+  const handleExportExcel = async () => {
+    try {
+      const response = await api.get('/students/graduation/export', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'data_kelulusan.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      showToast('Data kelulusan berhasil diekspor.', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Gagal mengekspor data kelulusan.', 'error');
+    }
+  };
 
   const sklPreview = sklFormat
     .replace('{seq}', '001')
@@ -422,8 +444,21 @@ export default function GraduationPage() {
               </button>
 
               {/* Batch Print SKL (Direct Download) */}
+              <BatchSkKelulusanDownloader />
+              <BatchBeritaAcaraDownloader />
+              <BatchAttendanceParentsDownloader />
+              <BatchInvitationDownloader />
               <BatchSklDownloader />
               <BatchSklDownloader withTranscript={true} />
+
+              {/* Export Excel */}
+              <button
+                onClick={handleExportExcel}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all border border-slate-700 shadow-md shadow-slate-900/20"
+              >
+                <Download className="w-4 h-4" />
+                Export Excel
+              </button>
 
               {/* Batch Cancel Graduation */}
               <button

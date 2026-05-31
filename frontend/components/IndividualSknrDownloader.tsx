@@ -225,7 +225,7 @@ export default function IndividualSknrDownloader({ studentId, className }: Indiv
                 position: relative;
               }
               .page-inner { padding: 2cm 2.5cm; min-height: 297mm; display: flex; flex-direction: column; }
-              .kop-surat-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+              .kop-surat-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; font-family: "Times New Roman", Times, serif; }
               .kop-surat-table td { vertical-align: middle; padding: 0; }
               .kop-logo-td { width: 105px; text-align: left; }
               .kop-logo-td img { width: 95px; height: 95px; object-fit: contain; }
@@ -236,7 +236,7 @@ export default function IndividualSknrDownloader({ studentId, className }: Indiv
               .kop-line-yayasan { font-size: 16px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; line-height: 1.3; }
               .kop-line-sekolah { font-size: 20px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; line-height: 1.2; margin: 2px 0 2px; }
               .kop-line-akreditasi { font-size: 14px; font-weight: bold; letter-spacing: 0.3px; text-transform: uppercase; }
-              .kop-line-alamat { font-size: 13px; font-weight: normal; line-height: 1.4; width: 100%; }
+              .kop-line-alamat { font-size: 13px; font-weight: normal; font-style: italic; line-height: 1.4; width: 100%; }
               .kop-divider { margin-top: 2px; }
               .kop-divider-thick { height: 3px; background: #000; margin-bottom: 2px; }
               .kop-divider-thin  { height: 1px; background: #000; }
@@ -284,7 +284,7 @@ export default function IndividualSknrDownloader({ studentId, className }: Indiv
                           <span className="kop-line-akreditasi">
                             TERAKREDITASI A NSM {docData.schoolProfile.nsm || '111233280040'} NPSN {docData.schoolProfile.npsn || '60713609'}
                           </span>
-                          <span className="kop-line-alamat">Alamat : {docData.schoolProfile.address}</span>
+                          <span className="kop-line-alamat">{docData.schoolProfile.address}</span>
                         </div>
                       </td>
                       <td className="kop-right-spacer"></td>
@@ -417,7 +417,11 @@ export default function IndividualSknrDownloader({ studentId, className }: Indiv
                   <div className="ttd-box">
                     <p style={{ marginBottom: '2px' }}>{docData.schoolProfile.city || '................'}, {formatDate(docData.student.graduationDate || new Date().toISOString())}</p>
                     <p>Kepala Madrasah,</p>
-                    <div className="ttd-space" />
+                    <div className="ttd-space">
+                      {docData.schoolProfile.signatureUrl && (
+                        <img src={docData.schoolProfile.signatureUrl} alt="Tanda Tangan" style={{ height: '100%', objectFit: 'contain' }} crossOrigin="anonymous" />
+                      )}
+                    </div>
                     <p className="ttd-name">{docData.schoolProfile.headmaster}</p>
                     <p>NIP. {docData.schoolProfile.headmasterNip || '-'}</p>
                   </div>

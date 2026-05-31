@@ -12,6 +12,6 @@ router.use(authenticateJWT);
 
 router.get('/', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getSchoolProfile);
 // Only ADMIN can update school profile
-router.put('/', requireRoles(Role.ADMIN), uploadImage.single('logo'), updateSchoolProfile);
+router.put('/', requireRoles(Role.ADMIN), uploadImage.fields([{ name: 'logo', maxCount: 1 }, { name: 'signature', maxCount: 1 }]), updateSchoolProfile);
 
 export default router;

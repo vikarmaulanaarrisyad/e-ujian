@@ -11,17 +11,21 @@ const defaultProfile = () => ({
   headmasterNip: '19700101 200003 1 001',
   city: null,
   logoUrl: null,
+  signatureUrl: null,
   sklNumberFormat: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 });
 
-// Helper: make logoUrl absolute
-const resolveLogoUrl = (profile: any, req: Request) => {
+// Helper: make logoUrl and signatureUrl absolute
+const resolveUrls = (profile: any, req: Request) => {
+  const host = req.get('host');
+  const protocol = req.protocol;
   if (profile.logoUrl && !profile.logoUrl.startsWith('http')) {
-    const host = req.get('host');
-    const protocol = req.protocol;
     profile.logoUrl = `${protocol}://${host}${profile.logoUrl}`;
+  }
+  if (profile.signatureUrl && !profile.signatureUrl.startsWith('http')) {
+    profile.signatureUrl = `${protocol}://${host}${profile.signatureUrl}`;
   }
   return profile;
 };
@@ -47,7 +51,7 @@ export const getStudentDocumentData = async (req: Request, res: Response, next: 
 
     // Fetch school profile
     let profile: any = await prisma.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
-    profile = resolveLogoUrl({ ...profile }, req);
+    profile = resolveUrls({ ...profile }, req);
 
     // Fetch student with all their grades
     const student = await prisma.student.findUnique({
@@ -174,7 +178,7 @@ export const getAllGraduatedSklData = async (req: Request, res: Response, next: 
 
     // Fetch school profile
     let profile: any = await prisma.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
-    profile = resolveLogoUrl({ ...profile }, req);
+    profile = resolveUrls({ ...profile }, req);
 
     // Fetch all graduated students ordered by sklNumber then name
     const students = await prisma.student.findMany({
@@ -263,7 +267,7 @@ export const getStudentSknrData = async (req: Request, res: Response, next: Next
     }
 
     let profile: any = await prisma.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
-    profile = resolveLogoUrl({ ...profile }, req);
+    profile = resolveUrls({ ...profile }, req);
 
     const student = await prisma.student.findUnique({
       where: { id },
@@ -388,7 +392,7 @@ export const getBatchTkaStatementData = async (req: Request, res: Response, next
     }
 
     let profile: any = await prisma.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
-    profile = resolveLogoUrl({ ...profile }, req);
+    profile = resolveUrls({ ...profile }, req);
 
     const students = await prisma.student.findMany({
       where: { tenantId, isGraduated: true },

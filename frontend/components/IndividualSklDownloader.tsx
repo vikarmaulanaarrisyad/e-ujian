@@ -161,7 +161,7 @@ export default function IndividualSklDownloader({ studentId, withTranscript = fa
                           <span className="kop-line-akreditasi">
                             TERAKREDITASI A NSM {docData.schoolProfile.nsm || '111233280040'} NPSN {docData.schoolProfile.npsn || '60713609'}
                           </span>
-                          <span className="kop-line-alamat">Alamat : {docData.schoolProfile.address}</span>
+                          <span className="kop-line-alamat">{docData.schoolProfile.address}</span>
                         </div>
                       </td>
                       <td className="kop-right-spacer"></td>
@@ -252,7 +252,11 @@ export default function IndividualSklDownloader({ studentId, withTranscript = fa
                   <div className="ttd-block">
                     <p>{docData.schoolProfile.city || 'Bondowoso'}, {formatDate(docData.student.graduationDate)}</p>
                     <p>Kepala Madrasah,</p>
-                    <div className="ttd-space" />
+                    <div className="ttd-space">
+                      {docData.schoolProfile.signatureUrl && (
+                        <img src={docData.schoolProfile.signatureUrl} alt="Tanda Tangan" style={{ height: '100%', objectFit: 'contain' }} crossOrigin="anonymous" />
+                      )}
+                    </div>
                     <p className="ttd-name">{docData.schoolProfile.headmaster}</p>
                     <p>NIP. {docData.schoolProfile.headmasterNip || '–'}</p>
                   </div>

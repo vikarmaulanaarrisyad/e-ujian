@@ -148,7 +148,7 @@ export default function BatchTkaDownloader({ className }: BatchTkaDownloaderProp
                             <span className="kop-line-akreditasi">
                               TERAKREDITASI A NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}
                             </span>
-                            <span className="kop-line-alamat">Alamat : {batchData.schoolProfile.address}</span>
+                            <span className="kop-line-alamat">{batchData.schoolProfile.address}</span>
                           </div>
                         </td>
                         <td className="kop-right-spacer"></td>

@@ -9,6 +9,7 @@ const DEFAULT_SCHOOL = {
   headmaster: 'H. Fulan, S.Pd.I',
   headmasterNip: '19700101 200003 1 001',
   city: null,
+  signatureUrl: null,
 };
 
 export const getSchoolProfile = async (req: Request, res: Response, next: NextFunction) => {
@@ -24,10 +25,14 @@ export const getSchoolProfile = async (req: Request, res: Response, next: NextFu
 
     // Ensure the logo URL is absolute so frontend can display it easily
     let responseProfile = { ...profile };
+    const host = req.get('host');
+    const protocol = req.protocol;
+    
     if (responseProfile.logoUrl && !responseProfile.logoUrl.startsWith('http')) {
-      const host = req.get('host');
-      const protocol = req.protocol;
       responseProfile.logoUrl = `${protocol}://${host}${responseProfile.logoUrl}`;
+    }
+    if (responseProfile.signatureUrl && !responseProfile.signatureUrl.startsWith('http')) {
+      responseProfile.signatureUrl = `${protocol}://${host}${responseProfile.signatureUrl}`;
     }
 
     return res.status(200).json(responseProfile);
@@ -42,10 +47,15 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
     let profile = await prisma.schoolProfile.findFirst();
 
     let logoUrl = profile?.logoUrl;
+    let signatureUrl = profile?.signatureUrl;
     
-    // If a new file is uploaded
-    if (req.file) {
-      logoUrl = `/uploads/${req.file.filename}`;
+    // If new files are uploaded
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    if (files?.logo && files.logo.length > 0) {
+      logoUrl = `/uploads/${files.logo[0].filename}`;
+    }
+    if (files?.signature && files.signature.length > 0) {
+      signatureUrl = `/uploads/${files.signature[0].filename}`;
     }
 
     if (profile) {
@@ -63,6 +73,7 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
           headmaster: headmaster || profile.headmaster,
           headmasterNip: headmasterNip || profile.headmasterNip,
           logoUrl,
+          signatureUrl,
           sklNumberFormat: sklNumberFormat !== undefined ? (sklNumberFormat || null) : profile.sklNumberFormat,
           sknrNumberFormat: sknrNumberFormat !== undefined ? (sknrNumberFormat || null) : profile.sknrNumberFormat,
         },
@@ -81,6 +92,7 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
           headmaster: headmaster || DEFAULT_SCHOOL.headmaster,
           headmasterNip: headmasterNip || DEFAULT_SCHOOL.headmasterNip,
           logoUrl,
+          signatureUrl,
           sklNumberFormat: sklNumberFormat || null,
           sknrNumberFormat: sknrNumberFormat || null,
         },
@@ -94,10 +106,14 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
     logActivity({ req, action: 'UPDATE_SCHOOL_PROFILE', entity: 'SchoolProfile', entityId: profile.id, description: `Memperbarui profil madrasah: ${profile.name}` });
 
     let responseProfile = { ...profile };
+    const host = req.get('host');
+    const protocol = req.protocol;
+    
     if (responseProfile.logoUrl && !responseProfile.logoUrl.startsWith('http')) {
-      const host = req.get('host');
-      const protocol = req.protocol;
       responseProfile.logoUrl = `${protocol}://${host}${responseProfile.logoUrl}`;
+    }
+    if (responseProfile.signatureUrl && !responseProfile.signatureUrl.startsWith('http')) {
+      responseProfile.signatureUrl = `${protocol}://${host}${responseProfile.signatureUrl}`;
     }
 
     return res.status(200).json({

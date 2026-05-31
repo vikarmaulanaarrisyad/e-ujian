@@ -175,7 +175,7 @@ export default function BatchSklDownloader({ withTranscript = false, className }
                               <span className="kop-line-akreditasi">
                                 TERAKREDITASI A NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}
                               </span>
-                              <span className="kop-line-alamat">Alamat : {batchData.schoolProfile.address}</span>
+                              <span className="kop-line-alamat">{batchData.schoolProfile.address}</span>
                             </div>
                           </td>
                           <td className="kop-right-spacer"></td>
@@ -268,7 +268,11 @@ export default function BatchSklDownloader({ withTranscript = false, className }
                       <div className="ttd-block">
                         <p>{batchData.schoolProfile.city || 'Bondowoso'}, {formatDate(student.graduationDate)}</p>
                         <p>Kepala Madrasah,</p>
-                        <div className="ttd-space" />
+                        <div className="ttd-space">
+                          {batchData.schoolProfile.signatureUrl && (
+                            <img src={batchData.schoolProfile.signatureUrl} alt="Tanda Tangan" style={{ height: '100%', objectFit: 'contain' }} crossOrigin="anonymous" />
+                          )}
+                        </div>
                         <p className="ttd-name">{batchData.schoolProfile.headmaster}</p>
                         <p>NIP. {batchData.schoolProfile.headmasterNip || '–'}</p>
                       </div>
