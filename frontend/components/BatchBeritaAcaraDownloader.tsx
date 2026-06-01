@@ -28,13 +28,14 @@ export default function BatchBeritaAcaraDownloader({ className }: BatchBeritaAca
 
   // Load from localStorage on mount
   useEffect(() => {
-    const savedNomor = localStorage.getItem('ba_nomorSurat');
-    const savedTgl = localStorage.getItem('ba_tanggalAcara');
-    const savedWaktu = localStorage.getItem('ba_waktuAcara');
-    const savedTempat = localStorage.getItem('ba_tempatAcara');
-    const savedPeserta = localStorage.getItem('ba_jumlahPeserta');
-    const savedNotulen = localStorage.getItem('ba_namaNotulen');
-    const savedNip = localStorage.getItem('ba_nipNotulen');
+    if (!user?.tenantId) return;
+    const savedNomor = localStorage.getItem(`${tenantPrefix}ba_nomorSurat`);
+    const savedTgl = localStorage.getItem(`${tenantPrefix}ba_tanggalAcara`);
+    const savedWaktu = localStorage.getItem(`${tenantPrefix}ba_waktuAcara`);
+    const savedTempat = localStorage.getItem(`${tenantPrefix}ba_tempatAcara`);
+    const savedPeserta = localStorage.getItem(`${tenantPrefix}ba_jumlahPeserta`);
+    const savedNotulen = localStorage.getItem(`${tenantPrefix}ba_namaNotulen`);
+    const savedNip = localStorage.getItem(`${tenantPrefix}ba_nipNotulen`);
     
     if (savedNomor) setNomorSurat(savedNomor);
     if (savedTgl) setTanggalAcara(savedTgl);
@@ -166,7 +167,7 @@ export default function BatchBeritaAcaraDownloader({ className }: BatchBeritaAca
     const HEADER_COST = 6;
     const FOOTER_COST = 6;
     
-    let currentChunk = [];
+    let currentChunk: any[] = [];
     let currentCost = HEADER_COST;
     
     for (let i = 0; i < students.length; i++) {
@@ -203,7 +204,7 @@ export default function BatchBeritaAcaraDownloader({ className }: BatchBeritaAca
     const HEADER_COST = 6;
     const FOOTER_COST = 5;
     
-    let currentChunk = [];
+    let currentChunk: any[] = [];
     let currentCost = HEADER_COST;
     
     for (let i = 0; i < rows.length; i++) {

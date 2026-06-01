@@ -146,7 +146,7 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
     const HEADER_COST = 9; // Biaya baris untuk Kop Surat + Detail Acara
     const FOOTER_COST = 6; // Biaya baris untuk Tanda Tangan
 
-    let currentChunk = [];
+    let currentChunk: any[] = [];
     let currentCost = HEADER_COST; // Halaman pertama selalu ada header
 
     for (let i = 0; i < students.length; i++) {

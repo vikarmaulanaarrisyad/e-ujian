@@ -144,7 +144,7 @@ export default function BatchSkKelulusanDownloader({ className }: BatchSkKelulus
     const HEADER_COST = 6; // Biaya baris untuk attachment-title
     const FOOTER_COST = 6; // Biaya baris untuk Tanda Tangan
 
-    let currentChunk = [];
+    let currentChunk: any[] = [];
     let currentCost = HEADER_COST; // Halaman pertama lampiran selalu ada header
 
     for (let i = 0; i < students.length; i++) {
@@ -459,7 +459,7 @@ export default function BatchSkKelulusanDownloader({ className }: BatchSkKelulus
                     <table style={{ width: '100%', marginBottom: '4px' }}>
                       <tbody>
                         <tr>
-                          <td style={{ width: '80px' }}>Ditetapkan di</td>
+                          <td style={{ width: '90px', whiteSpace: 'nowrap' }}>Ditetapkan di</td>
                           <td style={{ width: '10px' }}>:</td>
                           <td>{batchData.schoolProfile.city || 'Bondowoso'}</td>
                         </tr>

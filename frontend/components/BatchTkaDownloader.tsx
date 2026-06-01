@@ -143,7 +143,7 @@ export default function BatchTkaDownloader({ className }: BatchTkaDownloaderProp
                         </td>
                         <td className="kop-text-td">
                           <div className="kop-text-inner">
-                            <span className="kop-line-yayasan">YAYASAN BUSTANUL HUDA DAWUHAN</span>
+                            <span className="kop-line-yayasan">{batchData.schoolProfile?.foundationName?.toUpperCase() || batchData.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN"}</span>
                             <span className="kop-line-sekolah">{batchData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}</span>
                             <span className="kop-line-akreditasi">
                               TERAKREDITASI {batchData.schoolProfile.accreditation || 'A'} NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}

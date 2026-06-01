@@ -37,6 +37,7 @@ import BatchInvitationDownloader from '@/components/BatchInvitationDownloader';
 import IndividualSklDownloader from '@/components/IndividualSklDownloader';
 import IndividualSknrDownloader from '@/components/IndividualSknrDownloader';
 import IndividualIjazahDownloader from '@/components/IndividualIjazahDownloader';
+import BatchSknrDownloader from '@/components/BatchSknrDownloader';
 import BatchSkKelulusanDownloader from '@/components/BatchSkKelulusanDownloader';
 import BatchBeritaAcaraDownloader from '@/components/BatchBeritaAcaraDownloader';
 import BatchAttendanceParentsDownloader from '@/components/BatchAttendanceParentsDownloader';
@@ -444,6 +445,7 @@ export default function GraduationPage() {
               </button>
 
               {/* Batch Print SKL (Direct Download) */}
+              <BatchSknrDownloader />
               <BatchSkKelulusanDownloader />
               <BatchBeritaAcaraDownloader />
               <BatchAttendanceParentsDownloader />
