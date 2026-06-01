@@ -13,7 +13,18 @@ import {
   TrendingUp,
   BarChart3,
   ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
 } from 'lucide-react';
+import {
+  useReactTable,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  flexRender,
+  ColumnDef,
+  SortingState,
+} from '@tanstack/react-table';
 
 interface MissingReportGrade {
   studentId: string;
@@ -94,6 +105,10 @@ export default function MissingGradesPage() {
   const [filterSubjectId, setFilterSubjectId] = useState('');
   const [filterSemester, setFilterSemester] = useState('');
 
+  // Table States
+  const [reportSorting, setReportSorting] = useState<SortingState>([]);
+  const [examSorting, setExamSorting] = useState<SortingState>([]);
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['missingGrades'],
     queryFn: async () => {
@@ -158,6 +173,174 @@ export default function MissingGradesPage() {
 
   const allComplete =
     summary && summary.missingReportSlots === 0 && summary.missingExamSlots === 0;
+
+  // Report Columns
+  const reportColumns = useMemo<ColumnDef<MissingReportGrade>[]>(
+    () => [
+      {
+        accessorKey: 'nis',
+        header: 'NIS',
+        cell: (info) => <span className="font-mono text-slate-450">{info.getValue() as string}</span>,
+      },
+      {
+        accessorKey: 'studentName',
+        header: 'Nama Siswa',
+        cell: (info) => <span className="font-semibold text-slate-200">{info.getValue() as string}</span>,
+      },
+      {
+        accessorKey: 'subjectName',
+        header: 'Mata Pelajaran',
+        cell: (info) => {
+          const item = info.row.original;
+          return (
+            <div className="flex items-center gap-2">
+              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[9px] font-bold">
+                {item.subjectCode}
+              </span>
+              {item.subjectName}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'subjectGroup',
+        header: 'Kelompok',
+        cell: (info) => (
+          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-950/50 border border-indigo-900/50 text-indigo-400">
+            {(info.getValue() as string).replace('KELOMPOK_', 'Kel. ')}
+          </span>
+        ),
+      },
+      {
+        id: 'missingSemesters',
+        header: 'Semester yang Kosong',
+        cell: (info) => {
+          const item = info.row.original;
+          return (
+            <div className="flex flex-wrap gap-1.5">
+              {item.missingSemesters.map((sem) => (
+                <span
+                  key={sem}
+                  className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-orange-950/40 border border-orange-900/50 text-orange-400"
+                >
+                  {SEMESTER_LABELS[sem]}
+                </span>
+              ))}
+            </div>
+          );
+        },
+      },
+      {
+        id: 'count',
+        header: 'Jml Kosong',
+        cell: (info) => {
+          const item = info.row.original;
+          return (
+            <div className="text-center w-full">
+              <span
+                className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-extrabold ${
+                  item.missingSemesters.length >= ALL_SEMESTERS.length
+                    ? 'bg-rose-900/40 text-rose-400 border border-rose-800/50'
+                    : 'bg-orange-900/30 text-orange-400 border border-orange-800/40'
+                }`}
+              >
+                {item.missingSemesters.length}
+              </span>
+            </div>
+          );
+        },
+      },
+    ],
+    []
+  );
+
+  // Exam Columns
+  const examColumns = useMemo<ColumnDef<MissingExamGrade>[]>(
+    () => [
+      {
+        accessorKey: 'nis',
+        header: 'NIS',
+        cell: (info) => <span className="font-mono text-slate-450">{info.getValue() as string}</span>,
+      },
+      {
+        accessorKey: 'studentName',
+        header: 'Nama Siswa',
+        cell: (info) => <span className="font-semibold text-slate-200">{info.getValue() as string}</span>,
+      },
+      {
+        accessorKey: 'subjectName',
+        header: 'Mata Pelajaran',
+        cell: (info) => {
+          const item = info.row.original;
+          return (
+            <div className="flex items-center gap-2">
+              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[9px] font-bold">
+                {item.subjectCode}
+              </span>
+              {item.subjectName}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'subjectGroup',
+        header: 'Kelompok',
+        cell: (info) => (
+          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-950/50 border border-indigo-900/50 text-indigo-400">
+            {(info.getValue() as string).replace('KELOMPOK_', 'Kel. ')}
+          </span>
+        ),
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        cell: () => (
+          <div className="text-center w-full">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold bg-rose-950/40 border border-rose-900/50 text-rose-400">
+              <AlertTriangle className="w-2.5 h-2.5" />
+              Belum Diinput
+            </span>
+          </div>
+        ),
+      },
+    ],
+    []
+  );
+
+  // Table Instances
+  const reportTable = useReactTable({
+    data: filteredReport,
+    columns: reportColumns,
+    state: {
+      sorting: reportSorting,
+    },
+    onSortingChange: setReportSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
+  });
+
+  const examTable = useReactTable({
+    data: filteredExam,
+    columns: examColumns,
+    state: {
+      sorting: examSorting,
+    },
+    onSortingChange: setExamSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -387,66 +570,96 @@ export default function MissingGradesPage() {
                       </p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto rounded-xl border border-slate-800/60">
-                      <table className="w-full text-left border-collapse min-w-[600px]">
-                        <thead>
-                          <tr className="bg-slate-900/60 border-b border-slate-800/60 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                            <th className="py-3 px-4">NIS</th>
-                            <th className="py-3 px-4">Nama Siswa</th>
-                            <th className="py-3 px-4">Mata Pelajaran</th>
-                            <th className="py-3 px-4">Kelompok</th>
-                            <th className="py-3 px-4">Semester yang Kosong</th>
-                            <th className="py-3 px-4 text-center">Jml Kosong</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/40 text-xs">
-                          {filteredReport.map((item, idx) => (
-                            <tr
-                              key={`${item.studentId}-${item.subjectId}`}
-                              className={`transition-colors hover:bg-slate-900/30 ${idx % 2 === 0 ? '' : 'bg-slate-900/10'}`}
+                    <div className="space-y-4">
+                      <div className="overflow-x-auto rounded-xl border border-slate-800/60">
+                        <table className="w-full text-left border-collapse min-w-[600px]">
+                          <thead>
+                            {reportTable.getHeaderGroups().map(headerGroup => (
+                              <tr key={headerGroup.id} className="bg-slate-900/60 border-b border-slate-800/60 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                {headerGroup.headers.map(header => (
+                                  <th key={header.id} className="py-3 px-4">
+                                    {header.isPlaceholder ? null : (
+                                      <div
+                                        className={`flex items-center gap-1.5 ${
+                                          header.column.getCanSort() ? 'cursor-pointer select-none hover:text-slate-200' : ''
+                                        }`}
+                                        onClick={header.column.getToggleSortingHandler()}
+                                      >
+                                        {flexRender(header.column.columnDef.header, header.getContext())}
+                                        {header.column.getCanSort() && (
+                                          <span className="text-slate-500 shrink-0">
+                                            {{
+                                              asc: <ChevronUp className="w-3.5 h-3.5" />,
+                                              desc: <ChevronDown className="w-3.5 h-3.5" />,
+                                            }[header.column.getIsSorted() as string] ?? <ChevronsUpDown className="w-3.5 h-3.5" />}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </th>
+                                ))}
+                              </tr>
+                            ))}
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/40 text-xs">
+                            {reportTable.getRowModel().rows.map((row, idx) => (
+                              <tr
+                                key={row.id}
+                                className={`transition-colors hover:bg-slate-900/30 ${idx % 2 === 0 ? '' : 'bg-slate-900/10'}`}
+                              >
+                                {row.getVisibleCells().map(cell => (
+                                  <td key={cell.id} className="py-3 px-4">
+                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Pagination Controls */}
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-slate-800/60 text-xs text-slate-400">
+                        <div className="flex items-center gap-2.5">
+                          <span>Tampilkan</span>
+                          <select
+                            value={reportTable.getState().pagination.pageSize}
+                            onChange={e => reportTable.setPageSize(Number(e.target.value))}
+                            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none"
+                          >
+                            {[5, 10, 20, 50].map(pageSize => (
+                              <option key={pageSize} value={pageSize}>
+                                {pageSize}
+                              </option>
+                            ))}
+                          </select>
+                          <span>baris per halaman</span>
+                        </div>
+
+                        <div className="flex items-center gap-4.5">
+                          <span>
+                            Halaman <strong className="text-slate-205">{reportTable.getState().pagination.pageIndex + 1}</strong> dari{' '}
+                            <strong className="text-slate-205">{reportTable.getPageCount() || 1}</strong>
+                          </span>
+                          
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => reportTable.previousPage()}
+                              disabled={!reportTable.getCanPreviousPage()}
+                              className="px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl hover:bg-slate-850 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                             >
-                              <td className="py-3 px-4 font-mono text-slate-450">{item.nis}</td>
-                              <td className="py-3 px-4 font-semibold text-slate-200">{item.studentName}</td>
-                              <td className="py-3 px-4 text-slate-350">
-                                <div className="flex items-center gap-2">
-                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[9px] font-bold">
-                                    {item.subjectCode}
-                                  </span>
-                                  {item.subjectName}
-                                </div>
-                              </td>
-                              <td className="py-3 px-4">
-                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-950/50 border border-indigo-900/50 text-indigo-400">
-                                  {item.subjectGroup.replace('KELOMPOK_', 'Kel. ')}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4">
-                                <div className="flex flex-wrap gap-1.5">
-                                  {item.missingSemesters.map((sem) => (
-                                    <span
-                                      key={sem}
-                                      className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-orange-950/40 border border-orange-900/50 text-orange-400"
-                                    >
-                                      {SEMESTER_LABELS[sem]}
-                                    </span>
-                                  ))}
-                                </div>
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                <span
-                                  className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-extrabold ${
-                                    item.missingSemesters.length >= ALL_SEMESTERS.length
-                                      ? 'bg-rose-900/40 text-rose-400 border border-rose-800/50'
-                                      : 'bg-orange-900/30 text-orange-400 border border-orange-800/40'
-                                  }`}
-                                >
-                                  {item.missingSemesters.length}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                              Sebelumnya
+                            </button>
+                            <button
+                              onClick={() => reportTable.nextPage()}
+                              disabled={!reportTable.getCanNextPage()}
+                              className="px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl hover:bg-slate-850 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                            >
+                              Selanjutnya
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </>
@@ -465,48 +678,96 @@ export default function MissingGradesPage() {
                       </p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto rounded-xl border border-slate-800/60">
-                      <table className="w-full text-left border-collapse min-w-[500px]">
-                        <thead>
-                          <tr className="bg-slate-900/60 border-b border-slate-800/60 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                            <th className="py-3 px-4">NIS</th>
-                            <th className="py-3 px-4">Nama Siswa</th>
-                            <th className="py-3 px-4">Mata Pelajaran</th>
-                            <th className="py-3 px-4">Kelompok</th>
-                            <th className="py-3 px-4 text-center">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/40 text-xs">
-                          {filteredExam.map((item, idx) => (
-                            <tr
-                              key={`${item.studentId}-${item.subjectId}`}
-                              className={`transition-colors hover:bg-slate-900/30 ${idx % 2 === 0 ? '' : 'bg-slate-900/10'}`}
+                    <div className="space-y-4">
+                      <div className="overflow-x-auto rounded-xl border border-slate-800/60">
+                        <table className="w-full text-left border-collapse min-w-[500px]">
+                          <thead>
+                            {examTable.getHeaderGroups().map(headerGroup => (
+                              <tr key={headerGroup.id} className="bg-slate-900/60 border-b border-slate-800/60 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                {headerGroup.headers.map(header => (
+                                  <th key={header.id} className="py-3 px-4">
+                                    {header.isPlaceholder ? null : (
+                                      <div
+                                        className={`flex items-center gap-1.5 ${
+                                          header.column.getCanSort() ? 'cursor-pointer select-none hover:text-slate-200' : ''
+                                        }`}
+                                        onClick={header.column.getToggleSortingHandler()}
+                                      >
+                                        {flexRender(header.column.columnDef.header, header.getContext())}
+                                        {header.column.getCanSort() && (
+                                          <span className="text-slate-500 shrink-0">
+                                            {{
+                                              asc: <ChevronUp className="w-3.5 h-3.5" />,
+                                              desc: <ChevronDown className="w-3.5 h-3.5" />,
+                                            }[header.column.getIsSorted() as string] ?? <ChevronsUpDown className="w-3.5 h-3.5" />}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </th>
+                                ))}
+                              </tr>
+                            ))}
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/40 text-xs">
+                            {examTable.getRowModel().rows.map((row, idx) => (
+                              <tr
+                                key={row.id}
+                                className={`transition-colors hover:bg-slate-900/30 ${idx % 2 === 0 ? '' : 'bg-slate-900/10'}`}
+                              >
+                                {row.getVisibleCells().map(cell => (
+                                  <td key={cell.id} className="py-3 px-4">
+                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Pagination Controls */}
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-slate-800/60 text-xs text-slate-400">
+                        <div className="flex items-center gap-2.5">
+                          <span>Tampilkan</span>
+                          <select
+                            value={examTable.getState().pagination.pageSize}
+                            onChange={e => examTable.setPageSize(Number(e.target.value))}
+                            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none"
+                          >
+                            {[5, 10, 20, 50].map(pageSize => (
+                              <option key={pageSize} value={pageSize}>
+                                {pageSize}
+                              </option>
+                            ))}
+                          </select>
+                          <span>baris per halaman</span>
+                        </div>
+
+                        <div className="flex items-center gap-4.5">
+                          <span>
+                            Halaman <strong className="text-slate-205">{examTable.getState().pagination.pageIndex + 1}</strong> dari{' '}
+                            <strong className="text-slate-205">{examTable.getPageCount() || 1}</strong>
+                          </span>
+                          
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => examTable.previousPage()}
+                              disabled={!examTable.getCanPreviousPage()}
+                              className="px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl hover:bg-slate-850 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                             >
-                              <td className="py-3 px-4 font-mono text-slate-450">{item.nis}</td>
-                              <td className="py-3 px-4 font-semibold text-slate-200">{item.studentName}</td>
-                              <td className="py-3 px-4 text-slate-350">
-                                <div className="flex items-center gap-2">
-                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[9px] font-bold">
-                                    {item.subjectCode}
-                                  </span>
-                                  {item.subjectName}
-                                </div>
-                              </td>
-                              <td className="py-3 px-4">
-                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-950/50 border border-indigo-900/50 text-indigo-400">
-                                  {item.subjectGroup.replace('KELOMPOK_', 'Kel. ')}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold bg-rose-950/40 border border-rose-900/50 text-rose-400">
-                                  <AlertTriangle className="w-2.5 h-2.5" />
-                                  Belum Diinput
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                              Sebelumnya
+                            </button>
+                            <button
+                              onClick={() => examTable.nextPage()}
+                              disabled={!examTable.getCanNextPage()}
+                              className="px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl hover:bg-slate-850 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                            >
+                              Selanjutnya
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </>
