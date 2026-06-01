@@ -54,9 +54,14 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
     if (files?.logo && files.logo.length > 0) {
       logoUrl = `/uploads/${files.logo[0].filename}`;
+    } else if (req.body.deleteLogo === 'true') {
+      logoUrl = null;
     }
+
     if (files?.signature && files.signature.length > 0) {
       signatureUrl = `/uploads/${files.signature[0].filename}`;
+    } else if (req.body.deleteSignature === 'true') {
+      signatureUrl = null;
     }
 
     if (profile) {

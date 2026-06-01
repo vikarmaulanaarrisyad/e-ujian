@@ -53,6 +53,8 @@ export default function SchoolProfilePage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
   const [previewSignatureUrl, setPreviewSignatureUrl] = useState<string | null>(null);
+  const [deleteLogo, setDeleteLogo] = useState(false);
+  const [deleteSignature, setDeleteSignature] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -100,7 +102,14 @@ export default function SchoolProfilePage() {
       }
       setLogoFile(file);
       setPreviewUrl(URL.createObjectURL(file));
+      setDeleteLogo(false);
     }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setPreviewUrl(null);
+    setDeleteLogo(true);
   };
 
   const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,7 +121,14 @@ export default function SchoolProfilePage() {
       }
       setSignatureFile(file);
       setPreviewSignatureUrl(URL.createObjectURL(file));
+      setDeleteSignature(false);
     }
+  };
+
+  const handleRemoveSignature = () => {
+    setSignatureFile(null);
+    setPreviewSignatureUrl(null);
+    setDeleteSignature(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,9 +154,14 @@ export default function SchoolProfilePage() {
       
       if (logoFile) {
         formData.append('logo', logoFile);
+      } else if (deleteLogo) {
+        formData.append('deleteLogo', 'true');
       }
+      
       if (signatureFile) {
         formData.append('signature', signatureFile);
+      } else if (deleteSignature) {
+        formData.append('deleteSignature', 'true');
       }
 
       const res = await api.put('/school', formData, {
@@ -413,7 +434,7 @@ export default function SchoolProfilePage() {
           <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md shadow-xl text-center">
             <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-6 text-left">Logo Madrasah</h3>
             
-            <div className="relative group w-32 h-32 mx-auto rounded-2xl border-2 border-dashed border-slate-700 bg-slate-950/50 flex flex-col items-center justify-center overflow-hidden mb-6 transition-all hover:border-indigo-500/50">
+            <div className="relative group w-32 h-32 mx-auto rounded-2xl border-2 border-dashed border-slate-700 bg-slate-950/50 flex flex-col items-center justify-center overflow-hidden mb-4 transition-all hover:border-indigo-500/50">
               {previewUrl ? (
                 <div className="relative w-full h-full p-2">
                   <Image src={previewUrl} alt="Logo Madrasah" fill className="object-contain p-2" unoptimized />
@@ -433,6 +454,16 @@ export default function SchoolProfilePage() {
                 </label>
               )}
             </div>
+
+            {previewUrl && isAdmin && (
+              <button 
+                type="button" 
+                onClick={handleRemoveLogo}
+                className="mb-6 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 mx-auto transition-colors border border-red-500/20"
+              >
+                Hapus Logo
+              </button>
+            )}
             
             <div className="text-xs text-slate-500 text-left space-y-1.5">
               <p>📌 <strong>Catatan:</strong></p>
@@ -449,7 +480,7 @@ export default function SchoolProfilePage() {
           <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md shadow-xl text-center mt-6">
             <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-6 text-left">Tanda Tangan Kepala Madrasah</h3>
             
-            <div className="relative group w-48 h-24 mx-auto rounded-xl border-2 border-dashed border-slate-700 bg-slate-950/50 flex flex-col items-center justify-center overflow-hidden mb-6 transition-all hover:border-indigo-500/50">
+            <div className="relative group w-48 h-24 mx-auto rounded-xl border-2 border-dashed border-slate-700 bg-slate-950/50 flex flex-col items-center justify-center overflow-hidden mb-4 transition-all hover:border-indigo-500/50">
               {previewSignatureUrl ? (
                 <div className="relative w-full h-full p-2">
                   <Image src={previewSignatureUrl} alt="Tanda Tangan" fill className="object-contain p-2" unoptimized />
@@ -469,6 +500,16 @@ export default function SchoolProfilePage() {
                 </label>
               )}
             </div>
+
+            {previewSignatureUrl && isAdmin && (
+              <button 
+                type="button" 
+                onClick={handleRemoveSignature}
+                className="mb-6 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 mx-auto transition-colors border border-red-500/20"
+              >
+                Hapus Tanda Tangan
+              </button>
+            )}
             
             <div className="text-xs text-slate-500 text-left space-y-1.5">
               <p>📌 <strong>Sangat Disarankan:</strong></p>

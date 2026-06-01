@@ -279,7 +279,7 @@ export default function BatchSknrDownloader({ className }: BatchSknrDownloaderPr
               
               .closing-text { font-size: 13px; text-align: justify; margin-bottom: 40px; }
 
-              .footer-wrap { display: flex; justify-content: flex-end; gap: 40px; margin-top: auto; padding-top: 20px; }
+              .footer-wrap { display: flex; justify-content: flex-end; gap: 120px; margin-top: auto; padding-top: 20px; }
               .photo-box { width: 3cm; height: 4cm; border: 1px solid black; display: flex; align-items: center; justify-content: center; font-size: 11px; text-align: center; }
               .photo-img { width: 3cm; height: 4cm; object-fit: cover; border: 1px solid black; }
               .ttd-box { width: 250px; text-align: left; font-size: 13px; }
@@ -438,22 +438,10 @@ export default function BatchSknrDownloader({ className }: BatchSknrDownloaderPr
                     </div>
                     
                     <div className="ttd-box">
-                      <table style={{ width: '100%', marginBottom: '4px' }}>
-                        <tbody>
-                          <tr>
-                            <td style={{ width: '90px', whiteSpace: 'nowrap' }}>Ditetapkan di</td>
-                            <td style={{ width: '10px' }}>:</td>
-                            <td>{batchData.schoolProfile.city || '................'}</td>
-                          </tr>
-                          <tr>
-                            <td>Pada tanggal</td>
-                            <td>:</td>
-                            <td>{formatDate(studentData.graduationDate || new Date().toISOString())}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                      <div style={{ borderBottom: '1px solid black', width: '220px', marginBottom: '8px' }}></div>
-                      <p>Kepala Madrasah,</p>
+                      <div className="mb-2">
+                        {batchData.schoolProfile.city || '................'}, {formatDate(studentData.graduationDate)}<br/>
+                        Kepala Madrasah,
+                      </div>
                       <div className="ttd-space">
                         {batchData.schoolProfile.signatureUrl && (
                           <img src={batchData.schoolProfile.signatureUrl} alt="Tanda Tangan" style={{ height: '100%', objectFit: 'contain' }} crossOrigin="anonymous" />

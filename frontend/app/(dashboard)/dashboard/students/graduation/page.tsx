@@ -22,12 +22,20 @@ import {
   RefreshCw,
   ClipboardList,
   Download,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import {
   useReactTable,
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
+  getPaginationRowModel,
   flexRender,
   ColumnDef,
   SortingState,
@@ -62,6 +70,10 @@ export default function GraduationPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'graduated' | 'not_graduated'>('all');
+  const [pagination, setPagination] = useState({
+    pageIndex: 0,
+    pageSize: 10,
+  });
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -340,12 +352,14 @@ export default function GraduationPage() {
   const table = useReactTable({
     data: filteredStudents,
     columns,
-    state: { sorting, globalFilter },
+    state: { sorting, globalFilter, pagination },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   });
 
   const openModal = (student: Student) => {
@@ -572,14 +586,25 @@ export default function GraduationPage() {
             Memuat data...
           </div>
         ) : (
+          <>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[700px]">
               <thead>
                 {table.getHeaderGroups().map((hg) => (
                   <tr key={hg.id} className="border-b border-slate-800/60 bg-slate-900/40 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                     {hg.headers.map((h) => (
-                      <th key={h.id} className="py-3 px-4">
-                        {flexRender(h.column.columnDef.header, h.getContext())}
+                      <th 
+                        key={h.id} 
+                        className={`py-3 px-4 ${h.column.getCanSort() ? 'cursor-pointer select-none' : ''}`}
+                        onClick={h.column.getToggleSortingHandler()}
+                      >
+                        <div className="flex items-center gap-1">
+                          {flexRender(h.column.columnDef.header, h.getContext())}
+                          {{
+                            asc: <ChevronUp className="w-3 h-3 text-indigo-400" />,
+                            desc: <ChevronDown className="w-3 h-3 text-indigo-400" />,
+                          }[h.column.getIsSorted() as string] ?? (h.column.getCanSort() ? <ArrowUpDown className="w-3 h-3 opacity-30 group-hover:opacity-100" /> : null)}
+                        </div>
                       </th>
                     ))}
                   </tr>
@@ -598,6 +623,64 @@ export default function GraduationPage() {
               </tbody>
             </table>
           </div>
+          
+          <div className="p-4 border-t border-slate-800/60 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-4">
+            <div className="flex items-center gap-2">
+              <span>Tampilkan</span>
+              <select
+                value={table.getState().pagination.pageSize}
+                onChange={e => {
+                  table.setPageSize(Number(e.target.value))
+                }}
+                className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-indigo-500/50"
+              >
+                {[10, 20, 50, 100].map(pageSize => (
+                  <option key={pageSize} value={pageSize}>
+                    {pageSize}
+                  </option>
+                ))}
+              </select>
+              <span>baris</span>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <span>
+                Halaman <span className="font-bold text-slate-200">{table.getState().pagination.pageIndex + 1}</span> dari <span className="font-bold text-slate-200">{table.getPageCount() || 1}</span>
+              </span>
+              
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => table.setPageIndex(0)}
+                  disabled={!table.getCanPreviousPage()}
+                  className="p-1 rounded bg-slate-900/50 text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                  className="p-1 rounded bg-slate-900/50 text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                  className="p-1 rounded bg-slate-900/50 text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                  disabled={!table.getCanNextPage()}
+                  className="p-1 rounded bg-slate-900/50 text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronsRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+          </>
         )}
       </div>
 
