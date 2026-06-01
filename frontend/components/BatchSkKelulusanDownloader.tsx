@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import api from '@/lib/api';
 import { Loader2, FileCheck, X } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
@@ -18,6 +18,29 @@ export default function BatchSkKelulusanDownloader({ className }: BatchSkKelulus
   const [nomorSurat, setNomorSurat] = useState('');
   const [tanggalDitetapkan, setTanggalDitetapkan] = useState('');
   const [tanggalRapat, setTanggalRapat] = useState('');
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const savedNomor = localStorage.getItem('sk_nomorSurat');
+    const savedTglDitetapkan = localStorage.getItem('sk_tanggalDitetapkan');
+    const savedTglRapat = localStorage.getItem('sk_tanggalRapat');
+    if (savedNomor) setNomorSurat(savedNomor);
+    if (savedTglDitetapkan) setTanggalDitetapkan(savedTglDitetapkan);
+    if (savedTglRapat) setTanggalRapat(savedTglRapat);
+  }, []);
+
+  // Save to localStorage when values change
+  useEffect(() => {
+    localStorage.setItem('sk_nomorSurat', nomorSurat);
+  }, [nomorSurat]);
+
+  useEffect(() => {
+    localStorage.setItem('sk_tanggalDitetapkan', tanggalDitetapkan);
+  }, [tanggalDitetapkan]);
+
+  useEffect(() => {
+    localStorage.setItem('sk_tanggalRapat', tanggalRapat);
+  }, [tanggalRapat]);
 
   const handleOpenModal = () => setModalOpen(true);
   const handleCloseModal = () => {

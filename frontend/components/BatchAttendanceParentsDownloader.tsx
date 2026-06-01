@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import api from '@/lib/api';
 import { Loader2, UserCheck, X } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
@@ -20,6 +20,28 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
   const [tempatAcara, setTempatAcara] = useState('Aula Madrasah');
   const [agenda, setAgenda] = useState('Pengumuman Kelulusan dan Penyerahan SKL');
   const [paperSize, setPaperSize] = useState<'A4' | 'F4'>('A4');
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const savedTgl = localStorage.getItem('dh_tanggalAcara');
+    const savedWaktu = localStorage.getItem('dh_waktuAcara');
+    const savedTempat = localStorage.getItem('dh_tempatAcara');
+    const savedAgenda = localStorage.getItem('dh_agenda');
+    const savedPaper = localStorage.getItem('dh_paperSize');
+    
+    if (savedTgl) setTanggalAcara(savedTgl);
+    if (savedWaktu) setWaktuAcara(savedWaktu);
+    if (savedTempat) setTempatAcara(savedTempat);
+    if (savedAgenda) setAgenda(savedAgenda);
+    if (savedPaper) setPaperSize(savedPaper as 'A4' | 'F4');
+  }, []);
+
+  // Save to localStorage when values change
+  useEffect(() => { localStorage.setItem('dh_tanggalAcara', tanggalAcara); }, [tanggalAcara]);
+  useEffect(() => { localStorage.setItem('dh_waktuAcara', waktuAcara); }, [waktuAcara]);
+  useEffect(() => { localStorage.setItem('dh_tempatAcara', tempatAcara); }, [tempatAcara]);
+  useEffect(() => { localStorage.setItem('dh_agenda', agenda); }, [agenda]);
+  useEffect(() => { localStorage.setItem('dh_paperSize', paperSize); }, [paperSize]);
 
   const handleOpenModal = () => setModalOpen(true);
   const handleCloseModal = () => {

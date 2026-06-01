@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import api from '@/lib/api';
 import { Loader2, Users, X } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
@@ -22,6 +22,34 @@ export default function BatchBeritaAcaraDownloader({ className }: BatchBeritaAca
   const [jumlahPeserta, setJumlahPeserta] = useState('');
   const [namaNotulen, setNamaNotulen] = useState('');
   const [nipNotulen, setNipNotulen] = useState('');
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const savedNomor = localStorage.getItem('ba_nomorSurat');
+    const savedTgl = localStorage.getItem('ba_tanggalAcara');
+    const savedWaktu = localStorage.getItem('ba_waktuAcara');
+    const savedTempat = localStorage.getItem('ba_tempatAcara');
+    const savedPeserta = localStorage.getItem('ba_jumlahPeserta');
+    const savedNotulen = localStorage.getItem('ba_namaNotulen');
+    const savedNip = localStorage.getItem('ba_nipNotulen');
+    
+    if (savedNomor) setNomorSurat(savedNomor);
+    if (savedTgl) setTanggalAcara(savedTgl);
+    if (savedWaktu) setWaktuAcara(savedWaktu);
+    if (savedTempat) setTempatAcara(savedTempat);
+    if (savedPeserta) setJumlahPeserta(savedPeserta);
+    if (savedNotulen) setNamaNotulen(savedNotulen);
+    if (savedNip) setNipNotulen(savedNip);
+  }, []);
+
+  // Save to localStorage when values change
+  useEffect(() => { localStorage.setItem('ba_nomorSurat', nomorSurat); }, [nomorSurat]);
+  useEffect(() => { localStorage.setItem('ba_tanggalAcara', tanggalAcara); }, [tanggalAcara]);
+  useEffect(() => { localStorage.setItem('ba_waktuAcara', waktuAcara); }, [waktuAcara]);
+  useEffect(() => { localStorage.setItem('ba_tempatAcara', tempatAcara); }, [tempatAcara]);
+  useEffect(() => { localStorage.setItem('ba_jumlahPeserta', jumlahPeserta); }, [jumlahPeserta]);
+  useEffect(() => { localStorage.setItem('ba_namaNotulen', namaNotulen); }, [namaNotulen]);
+  useEffect(() => { localStorage.setItem('ba_nipNotulen', nipNotulen); }, [nipNotulen]);
 
   const handleOpenModal = () => setModalOpen(true);
   const handleCloseModal = () => {
