@@ -128,11 +128,93 @@ export default function BatchBeritaAcaraDownloader({ className }: BatchBeritaAca
     return chunked;
   };
 
-  const studentChunks = batchData ? chunkArray(batchData.students, 30) : [];
+  const createStudentChunks = (students: any[]) => {
+    if (!students || students.length === 0) return [];
+    const chunks = [];
+    const MAX_ROWS = 40;
+    const HEADER_COST = 6;
+    const FOOTER_COST = 6;
+    
+    let currentChunk = [];
+    let currentCost = HEADER_COST;
+    
+    for (let i = 0; i < students.length; i++) {
+      let isLast = (i === students.length - 1);
+      let nextCost = currentCost + 1;
+      
+      if (isLast) {
+        if (nextCost + FOOTER_COST <= MAX_ROWS) {
+           currentChunk.push(students[i]);
+           chunks.push(currentChunk);
+           break;
+        } else {
+           chunks.push(currentChunk);
+           chunks.push([students[i]]); 
+           break;
+        }
+      }
+      if (nextCost <= MAX_ROWS) {
+        currentChunk.push(students[i]);
+        currentCost = nextCost;
+      } else {
+        chunks.push(currentChunk);
+        currentChunk = [students[i]];
+        currentCost = 1; 
+      }
+    }
+    return chunks;
+  };
+
+  const createAttendanceChunks = (rows: number[]) => {
+    if (!rows || rows.length === 0) return [];
+    const chunks = [];
+    const MAX_ROWS = 28;
+    const HEADER_COST = 6;
+    const FOOTER_COST = 5;
+    
+    let currentChunk = [];
+    let currentCost = HEADER_COST;
+    
+    for (let i = 0; i < rows.length; i++) {
+      let isLast = (i === rows.length - 1);
+      let nextCost = currentCost + 1;
+      
+      if (isLast) {
+        if (nextCost + FOOTER_COST <= MAX_ROWS) {
+           currentChunk.push(rows[i]);
+           chunks.push(currentChunk);
+           break;
+        } else {
+           chunks.push(currentChunk);
+           chunks.push([rows[i]]); 
+           break;
+        }
+      }
+      if (nextCost <= MAX_ROWS) {
+        currentChunk.push(rows[i]);
+        currentCost = nextCost;
+      } else {
+        chunks.push(currentChunk);
+        currentChunk = [rows[i]];
+        currentCost = 1; 
+      }
+    }
+    return chunks;
+  };
+
+  const studentChunks = batchData ? createStudentChunks(batchData.students) : [];
   
   const numPeserta = parseInt(jumlahPeserta) || 0;
   const attendanceRows = Array.from({ length: numPeserta }, (_, i) => i + 1);
-  const attendanceChunks = chunkArray(attendanceRows, 25); // 25 rows per page for attendance
+  const attendanceChunks = createAttendanceChunks(attendanceRows);
+
+  const getStartIndex = (chunks: any[][], chunkIndex: number) => {
+    let count = 0;
+    for (let i = 0; i < chunkIndex; i++) {
+      count += chunks[i].length;
+    }
+    return count;
+  };
 
   return (
     <>
@@ -437,16 +519,21 @@ export default function BatchBeritaAcaraDownloader({ className }: BatchBeritaAca
             </div>
 
             {/* Halaman 2+: Lampiran Daftar Siswa Lulus */}
-            {studentChunks.map((chunk, chunkIndex) => (
+            {studentChunks.map((chunk, chunkIndex) => {
+              const startIndex = getStartIndex(studentChunks, chunkIndex);
+              
+              return (
               <div key={chunkIndex} className="berita-acara-page">
                 <div className="page-inner">
-                  <div className="attachment-title">
-                    LAMPIRAN BERITA ACARA RAPAT PENENTUAN KELULUSAN<br/>
-                    TENTANG KELULUSAN PESERTA DIDIK TAHUN PELAJARAN {batchData.academicYear}<br/>
-                    {batchData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}
-                  </div>
+                  {chunkIndex === 0 && (
+                    <div className="attachment-title">
+                      LAMPIRAN BERITA ACARA RAPAT PENENTUAN KELULUSAN<br/>
+                      TENTANG KELULUSAN PESERTA DIDIK TAHUN PELAJARAN {batchData.academicYear}<br/>
+                      {batchData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}
+                    </div>
+                  )}
 
-                  <table className="student-table">
+                  <table className="student-table" style={chunkIndex > 0 ? { marginTop: '20px' } : {}}>
                     <thead>
                       <tr>
                         <th className="col-no">No</th>
@@ -457,7 +544,7 @@ export default function BatchBeritaAcaraDownloader({ className }: BatchBeritaAca
                     </thead>
                     <tbody>
                       {chunk.map((student: any, idx: number) => {
-                        const globalIndex = (chunkIndex * 30) + idx + 1;
+                        const globalIndex = startIndex + idx + 1;
                         return (
                           <tr key={student.id}>
                             <td className="col-no">{globalIndex}</td>
@@ -471,40 +558,47 @@ export default function BatchBeritaAcaraDownloader({ className }: BatchBeritaAca
                   </table>
                   
                   {/* Tanda tangan Kepala Madrasah di bagian bawah halaman lampiran (opsional, tapi sering diminta) */}
-                  <div className="signatures-wrap" style={{ marginTop: 'auto', paddingTop: '40px' }}>
-                    <div className="ttd-block"></div>
-                    <div className="ttd-block">
-                      <p>Kepala Madrasah,</p>
-                      <div className="ttd-space">
-                        {batchData.schoolProfile.signatureUrl && (
-                          <img src={batchData.schoolProfile.signatureUrl} alt="Tanda Tangan" style={{ height: '100%', objectFit: 'contain' }} crossOrigin="anonymous" />
-                        )}
+                  {chunkIndex === studentChunks.length - 1 && (
+                    <div className="signatures-wrap" style={{ marginTop: '40px' }}>
+                      <div className="ttd-block"></div>
+                      <div className="ttd-block">
+                        <p>Kepala Madrasah,</p>
+                        <div className="ttd-space">
+                          {batchData.schoolProfile.signatureUrl && (
+                            <img src={batchData.schoolProfile.signatureUrl} alt="Tanda Tangan" style={{ height: '100%', objectFit: 'contain' }} crossOrigin="anonymous" />
+                          )}
+                        </div>
+                        <p className="ttd-name">{batchData.schoolProfile.headmaster}</p>
+                        <p>NIP. {batchData.schoolProfile.headmasterNip || '–'}</p>
                       </div>
-                      <p className="ttd-name">{batchData.schoolProfile.headmaster}</p>
-                      <p>NIP. {batchData.schoolProfile.headmasterNip || '–'}</p>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
-            ))}
+            );
+          })}
 
             {/* Halaman 3+: Lampiran Daftar Hadir */}
             {attendanceChunks.map((chunk, chunkIndex) => (
               <div key={`attendance-${chunkIndex}`} className="berita-acara-page">
                 <div className="page-inner">
-                  <div className="attachment-title">
-                    DAFTAR HADIR RAPAT PLENO PENENTUAN KELULUSAN<br/>
-                    TAHUN PELAJARAN {batchData.academicYear}<br/>
-                    {batchData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}
-                  </div>
-                  
-                  <div style={{ display: 'flex', justifyItems: 'center', gap: '40px', marginBottom: '16px', fontSize: '14px' }}>
-                    <div style={{ flex: 1 }}><strong>Hari / Tanggal:</strong> {formatTanggalFormal(tanggalAcara)}</div>
-                    <div style={{ flex: 1 }}><strong>Waktu:</strong> {waktuAcara}</div>
-                    <div style={{ flex: 1 }}><strong>Tempat:</strong> {tempatAcara}</div>
-                  </div>
+                  {chunkIndex === 0 && (
+                    <>
+                      <div className="attachment-title">
+                        DAFTAR HADIR RAPAT PLENO PENENTUAN KELULUSAN<br/>
+                        TAHUN PELAJARAN {batchData.academicYear}<br/>
+                        {batchData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}
+                      </div>
+                      
+                      <div style={{ display: 'flex', justifyItems: 'center', gap: '40px', marginBottom: '16px', fontSize: '14px' }}>
+                        <div style={{ flex: 1 }}><strong>Hari / Tanggal:</strong> {formatTanggalFormal(tanggalAcara)}</div>
+                        <div style={{ flex: 1 }}><strong>Waktu:</strong> {waktuAcara}</div>
+                        <div style={{ flex: 1 }}><strong>Tempat:</strong> {tempatAcara}</div>
+                      </div>
+                    </>
+                  )}
 
-                  <table className="student-table" style={{ marginBottom: '0' }}>
+                  <table className="student-table" style={chunkIndex > 0 ? { marginBottom: '0', marginTop: '20px' } : { marginBottom: '0' }}>
                     <thead>
                       <tr>
                         <th className="col-no">No</th>
@@ -534,19 +628,21 @@ export default function BatchBeritaAcaraDownloader({ className }: BatchBeritaAca
                   </table>
                   
                   {/* Tanda tangan Kepala Madrasah di bagian bawah halaman lampiran */}
-                  <div className="signatures-wrap" style={{ marginTop: 'auto', paddingTop: '40px' }}>
-                    <div className="ttd-block"></div>
-                    <div className="ttd-block">
-                      <p>Kepala Madrasah,</p>
-                      <div className="ttd-space">
-                        {batchData.schoolProfile.signatureUrl && (
-                          <img src={batchData.schoolProfile.signatureUrl} alt="Tanda Tangan" style={{ height: '100%', objectFit: 'contain' }} crossOrigin="anonymous" />
-                        )}
+                  {chunkIndex === attendanceChunks.length - 1 && (
+                    <div className="signatures-wrap" style={{ marginTop: '40px' }}>
+                      <div className="ttd-block"></div>
+                      <div className="ttd-block">
+                        <p>Kepala Madrasah,</p>
+                        <div className="ttd-space">
+                          {batchData.schoolProfile.signatureUrl && (
+                            <img src={batchData.schoolProfile.signatureUrl} alt="Tanda Tangan" style={{ height: '100%', objectFit: 'contain' }} crossOrigin="anonymous" />
+                          )}
+                        </div>
+                        <p className="ttd-name">{batchData.schoolProfile.headmaster}</p>
+                        <p>NIP. {batchData.schoolProfile.headmasterNip || '–'}</p>
                       </div>
-                      <p className="ttd-name">{batchData.schoolProfile.headmaster}</p>
-                      <p>NIP. {batchData.schoolProfile.headmasterNip || '–'}</p>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             ))}
