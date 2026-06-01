@@ -10,6 +10,7 @@ const DEFAULT_SCHOOL = {
   headmasterNip: '19700101 200003 1 001',
   city: null,
   signatureUrl: null,
+  accreditation: 'A',
 };
 
 export const getSchoolProfile = async (req: Request, res: Response, next: NextFunction) => {
@@ -43,7 +44,7 @@ export const getSchoolProfile = async (req: Request, res: Response, next: NextFu
 
 export const updateSchoolProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, foundationName, npsn, nsm, address, district, province, headmaster, headmasterNip, city, sklNumberFormat, sknrNumberFormat } = req.body;
+    const { name, foundationName, npsn, nsm, address, district, province, headmaster, headmasterNip, city, sklNumberFormat, sknrNumberFormat, accreditation } = req.body;
     let profile = await prisma.schoolProfile.findFirst();
 
     let logoUrl = profile?.logoUrl;
@@ -76,6 +77,7 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
           signatureUrl,
           sklNumberFormat: sklNumberFormat !== undefined ? (sklNumberFormat || null) : profile.sklNumberFormat,
           sknrNumberFormat: sknrNumberFormat !== undefined ? (sknrNumberFormat || null) : profile.sknrNumberFormat,
+          accreditation: accreditation !== undefined ? (accreditation || 'A') : profile.accreditation,
         },
       });
     } else {
@@ -95,6 +97,7 @@ export const updateSchoolProfile = async (req: Request, res: Response, next: Nex
           signatureUrl,
           sklNumberFormat: sklNumberFormat || null,
           sknrNumberFormat: sknrNumberFormat || null,
+          accreditation: accreditation || 'A',
         },
       });
     }

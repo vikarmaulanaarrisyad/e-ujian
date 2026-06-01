@@ -13,6 +13,7 @@ const defaultProfile = () => ({
   logoUrl: null,
   signatureUrl: null,
   sklNumberFormat: null,
+  accreditation: 'A',
   createdAt: new Date(),
   updatedAt: new Date(),
 });

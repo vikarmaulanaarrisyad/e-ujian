@@ -282,7 +282,7 @@ export default function IndividualSknrDownloader({ studentId, className }: Indiv
                           <span className="kop-line-yayasan">{docData.schoolProfile?.foundationName?.toUpperCase() || docData.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN"}</span>
                           <span className="kop-line-sekolah">{docData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}</span>
                           <span className="kop-line-akreditasi">
-                            TERAKREDITASI A NSM {docData.schoolProfile.nsm || '111233280040'} NPSN {docData.schoolProfile.npsn || '60713609'}
+                            TERAKREDITASI {docData.schoolProfile.accreditation || 'A'} NSM {docData.schoolProfile.nsm || '111233280040'} NPSN {docData.schoolProfile.npsn || '60713609'}
                           </span>
                           <span className="kop-line-alamat">{docData.schoolProfile.address}</span>
                         </div>

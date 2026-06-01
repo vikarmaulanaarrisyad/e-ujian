@@ -22,6 +22,7 @@ interface SchoolProfile {
   signatureUrl: string | null;
   sklNumberFormat: string;
   sknrNumberFormat: string;
+  accreditation: string;
 }
 
 export default function SchoolProfilePage() {
@@ -43,6 +44,7 @@ export default function SchoolProfilePage() {
     signatureUrl: null,
     sklNumberFormat: 'B.{seq}/MI.BH/{year}',
     sknrNumberFormat: 'B.{seq}/SKNR/MI.BH/{year}',
+    accreditation: 'A',
   });
   
   const [loading, setLoading] = useState(true);
@@ -72,6 +74,7 @@ export default function SchoolProfilePage() {
           signatureUrl: data.signatureUrl || null,
           sklNumberFormat: data.sklNumberFormat || 'B.{seq}/MI.BH/{year}',
           sknrNumberFormat: data.sknrNumberFormat || 'B.{seq}/SKNR/MI.BH/{year}',
+          accreditation: data.accreditation || 'A',
         });
         if (data.logoUrl) {
           setPreviewUrl(data.logoUrl);
@@ -131,6 +134,7 @@ export default function SchoolProfilePage() {
       formData.append('city', profile.city);
       formData.append('sklNumberFormat', profile.sklNumberFormat);
       formData.append('sknrNumberFormat', profile.sknrNumberFormat);
+      formData.append('accreditation', profile.accreditation);
       
       if (logoFile) {
         formData.append('logo', logoFile);
@@ -218,6 +222,18 @@ export default function SchoolProfilePage() {
                     disabled={!isAdmin}
                     className="block w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-50"
                     required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Akreditasi</label>
+                  <input
+                    type="text"
+                    value={profile.accreditation}
+                    onChange={(e) => setProfile({ ...profile, accreditation: e.target.value })}
+                    disabled={!isAdmin}
+                    placeholder="Contoh: A, B, C, atau Tidak Terakreditasi"
+                    className="block w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-50"
                   />
                 </div>
 

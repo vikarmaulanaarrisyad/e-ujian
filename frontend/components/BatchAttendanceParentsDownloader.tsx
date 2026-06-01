@@ -3,12 +3,15 @@ import api from '@/lib/api';
 import { Loader2, UserCheck, X } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
 import jsPDF from 'jspdf';
+import { useAuth } from '@/context/AuthContext';
 
 interface BatchAttendanceParentsDownloaderProps {
   className?: string;
 }
 
 export default function BatchAttendanceParentsDownloader({ className }: BatchAttendanceParentsDownloaderProps) {
+  const { user } = useAuth();
+  const tenantPrefix = user?.tenantId ? `${user.tenantId}_` : '';
   const [modalOpen, setModalOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [batchData, setBatchData] = useState<any>(null);
@@ -23,25 +26,26 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
 
   // Load from localStorage on mount
   useEffect(() => {
-    const savedTgl = localStorage.getItem('dh_tanggalAcara');
-    const savedWaktu = localStorage.getItem('dh_waktuAcara');
-    const savedTempat = localStorage.getItem('dh_tempatAcara');
-    const savedAgenda = localStorage.getItem('dh_agenda');
-    const savedPaper = localStorage.getItem('dh_paperSize');
+    if (!user?.tenantId) return;
+    const savedTgl = localStorage.getItem(`${tenantPrefix}dh_tanggalAcara`);
+    const savedWaktu = localStorage.getItem(`${tenantPrefix}dh_waktuAcara`);
+    const savedTempat = localStorage.getItem(`${tenantPrefix}dh_tempatAcara`);
+    const savedAgenda = localStorage.getItem(`${tenantPrefix}dh_agenda`);
+    const savedPaper = localStorage.getItem(`${tenantPrefix}dh_paperSize`);
     
     if (savedTgl) setTanggalAcara(savedTgl);
     if (savedWaktu) setWaktuAcara(savedWaktu);
     if (savedTempat) setTempatAcara(savedTempat);
     if (savedAgenda) setAgenda(savedAgenda);
     if (savedPaper) setPaperSize(savedPaper as 'A4' | 'F4');
-  }, []);
+  }, [user?.tenantId, tenantPrefix]);
 
   // Save to localStorage when values change
-  useEffect(() => { localStorage.setItem('dh_tanggalAcara', tanggalAcara); }, [tanggalAcara]);
-  useEffect(() => { localStorage.setItem('dh_waktuAcara', waktuAcara); }, [waktuAcara]);
-  useEffect(() => { localStorage.setItem('dh_tempatAcara', tempatAcara); }, [tempatAcara]);
-  useEffect(() => { localStorage.setItem('dh_agenda', agenda); }, [agenda]);
-  useEffect(() => { localStorage.setItem('dh_paperSize', paperSize); }, [paperSize]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}dh_tanggalAcara`, tanggalAcara); }, [tanggalAcara, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}dh_waktuAcara`, waktuAcara); }, [waktuAcara, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}dh_tempatAcara`, tempatAcara); }, [tempatAcara, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}dh_agenda`, agenda); }, [agenda, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}dh_paperSize`, paperSize); }, [paperSize, user?.tenantId, tenantPrefix]);
 
   const handleOpenModal = () => setModalOpen(true);
   const handleCloseModal = () => {
@@ -375,7 +379,7 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
                             <span className="kop-line-yayasan">{batchData.schoolProfile?.foundationName?.toUpperCase() || batchData.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN"}</span>
                             <span className="kop-line-sekolah">{batchData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}</span>
                             <span className="kop-line-akreditasi">
-                              TERAKREDITASI A NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}
+                              TERAKREDITASI {batchData.schoolProfile.accreditation || 'A'} NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}
                             </span>
                             <span className="kop-line-alamat">{batchData.schoolProfile.address}</span>
                           </div>

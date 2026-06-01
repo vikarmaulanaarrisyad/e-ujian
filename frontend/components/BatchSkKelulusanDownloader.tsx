@@ -3,12 +3,15 @@ import api from '@/lib/api';
 import { Loader2, FileCheck, X } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
 import jsPDF from 'jspdf';
+import { useAuth } from '@/context/AuthContext';
 
 interface BatchSkKelulusanDownloaderProps {
   className?: string;
 }
 
 export default function BatchSkKelulusanDownloader({ className }: BatchSkKelulusanDownloaderProps) {
+  const { user } = useAuth();
+  const tenantPrefix = user?.tenantId ? `${user.tenantId}_` : '';
   const [modalOpen, setModalOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [batchData, setBatchData] = useState<any>(null);
@@ -21,26 +24,27 @@ export default function BatchSkKelulusanDownloader({ className }: BatchSkKelulus
 
   // Load from localStorage on mount
   useEffect(() => {
-    const savedNomor = localStorage.getItem('sk_nomorSurat');
-    const savedTglDitetapkan = localStorage.getItem('sk_tanggalDitetapkan');
-    const savedTglRapat = localStorage.getItem('sk_tanggalRapat');
+    if (!user?.tenantId) return;
+    const savedNomor = localStorage.getItem(`${tenantPrefix}sk_nomorSurat`);
+    const savedTglDitetapkan = localStorage.getItem(`${tenantPrefix}sk_tanggalDitetapkan`);
+    const savedTglRapat = localStorage.getItem(`${tenantPrefix}sk_tanggalRapat`);
     if (savedNomor) setNomorSurat(savedNomor);
     if (savedTglDitetapkan) setTanggalDitetapkan(savedTglDitetapkan);
     if (savedTglRapat) setTanggalRapat(savedTglRapat);
-  }, []);
+  }, [user?.tenantId, tenantPrefix]);
 
   // Save to localStorage when values change
   useEffect(() => {
-    localStorage.setItem('sk_nomorSurat', nomorSurat);
-  }, [nomorSurat]);
+    if (user?.tenantId) localStorage.setItem(`${tenantPrefix}sk_nomorSurat`, nomorSurat);
+  }, [nomorSurat, user?.tenantId, tenantPrefix]);
 
   useEffect(() => {
-    localStorage.setItem('sk_tanggalDitetapkan', tanggalDitetapkan);
-  }, [tanggalDitetapkan]);
+    if (user?.tenantId) localStorage.setItem(`${tenantPrefix}sk_tanggalDitetapkan`, tanggalDitetapkan);
+  }, [tanggalDitetapkan, user?.tenantId, tenantPrefix]);
 
   useEffect(() => {
-    localStorage.setItem('sk_tanggalRapat', tanggalRapat);
-  }, [tanggalRapat]);
+    if (user?.tenantId) localStorage.setItem(`${tenantPrefix}sk_tanggalRapat`, tanggalRapat);
+  }, [tanggalRapat, user?.tenantId, tenantPrefix]);
 
   const handleOpenModal = () => setModalOpen(true);
   const handleCloseModal = () => {
@@ -348,7 +352,7 @@ export default function BatchSkKelulusanDownloader({ className }: BatchSkKelulus
                           <span className="kop-line-yayasan">{batchData.schoolProfile?.foundationName?.toUpperCase() || batchData.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN"}</span>
                           <span className="kop-line-sekolah">{batchData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}</span>
                           <span className="kop-line-akreditasi">
-                            TERAKREDITASI A NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}
+                            TERAKREDITASI {batchData.schoolProfile.accreditation || 'A'} NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}
                           </span>
                           <span className="kop-line-alamat">{batchData.schoolProfile.address}</span>
                         </div>

@@ -3,12 +3,15 @@ import api from '@/lib/api';
 import { Loader2, Users, X } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
 import jsPDF from 'jspdf';
+import { useAuth } from '@/context/AuthContext';
 
 interface BatchBeritaAcaraDownloaderProps {
   className?: string;
 }
 
 export default function BatchBeritaAcaraDownloader({ className }: BatchBeritaAcaraDownloaderProps) {
+  const { user } = useAuth();
+  const tenantPrefix = user?.tenantId ? `${user.tenantId}_` : '';
   const [modalOpen, setModalOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [batchData, setBatchData] = useState<any>(null);
@@ -40,16 +43,16 @@ export default function BatchBeritaAcaraDownloader({ className }: BatchBeritaAca
     if (savedPeserta) setJumlahPeserta(savedPeserta);
     if (savedNotulen) setNamaNotulen(savedNotulen);
     if (savedNip) setNipNotulen(savedNip);
-  }, []);
+  }, [user?.tenantId, tenantPrefix]);
 
   // Save to localStorage when values change
-  useEffect(() => { localStorage.setItem('ba_nomorSurat', nomorSurat); }, [nomorSurat]);
-  useEffect(() => { localStorage.setItem('ba_tanggalAcara', tanggalAcara); }, [tanggalAcara]);
-  useEffect(() => { localStorage.setItem('ba_waktuAcara', waktuAcara); }, [waktuAcara]);
-  useEffect(() => { localStorage.setItem('ba_tempatAcara', tempatAcara); }, [tempatAcara]);
-  useEffect(() => { localStorage.setItem('ba_jumlahPeserta', jumlahPeserta); }, [jumlahPeserta]);
-  useEffect(() => { localStorage.setItem('ba_namaNotulen', namaNotulen); }, [namaNotulen]);
-  useEffect(() => { localStorage.setItem('ba_nipNotulen', nipNotulen); }, [nipNotulen]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}ba_nomorSurat`, nomorSurat); }, [nomorSurat, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}ba_tanggalAcara`, tanggalAcara); }, [tanggalAcara, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}ba_waktuAcara`, waktuAcara); }, [waktuAcara, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}ba_tempatAcara`, tempatAcara); }, [tempatAcara, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}ba_jumlahPeserta`, jumlahPeserta); }, [jumlahPeserta, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}ba_namaNotulen`, namaNotulen); }, [namaNotulen, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}ba_nipNotulen`, nipNotulen); }, [nipNotulen, user?.tenantId, tenantPrefix]);
 
   const handleOpenModal = () => setModalOpen(true);
   const handleCloseModal = () => {
@@ -456,7 +459,7 @@ export default function BatchBeritaAcaraDownloader({ className }: BatchBeritaAca
                           <span className="kop-line-yayasan">{batchData.schoolProfile?.foundationName?.toUpperCase() || batchData.schoolProfile?.tenant?.name?.toUpperCase() || "YAYASAN BUSTANUL HUDA DAWUHAN"}</span>
                           <span className="kop-line-sekolah">{batchData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}</span>
                           <span className="kop-line-akreditasi">
-                            TERAKREDITASI A NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}
+                            TERAKREDITASI {batchData.schoolProfile.accreditation || 'A'} NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}
                           </span>
                           <span className="kop-line-alamat">{batchData.schoolProfile.address}</span>
                         </div>

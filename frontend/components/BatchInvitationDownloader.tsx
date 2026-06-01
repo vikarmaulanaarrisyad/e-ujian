@@ -3,12 +3,15 @@ import api from '@/lib/api';
 import { Loader2, Mail, X } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
 import jsPDF from 'jspdf';
+import { useAuth } from '@/context/AuthContext';
 
 interface BatchInvitationDownloaderProps {
   className?: string;
 }
 
 export default function BatchInvitationDownloader({ className }: BatchInvitationDownloaderProps) {
+  const { user } = useAuth();
+  const tenantPrefix = user?.tenantId ? `${user.tenantId}_` : '';
   const [modalOpen, setModalOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [batchData, setBatchData] = useState<any>(null);
@@ -23,25 +26,26 @@ export default function BatchInvitationDownloader({ className }: BatchInvitation
 
   // Load from localStorage on mount
   useEffect(() => {
-    const savedNomor = localStorage.getItem('inv_nomorSurat');
-    const savedHal = localStorage.getItem('inv_hal');
-    const savedTgl = localStorage.getItem('inv_tanggalAcara');
-    const savedWaktu = localStorage.getItem('inv_waktuAcara');
-    const savedTempat = localStorage.getItem('inv_tempatAcara');
+    if (!user?.tenantId) return;
+    const savedNomor = localStorage.getItem(`${tenantPrefix}inv_nomorSurat`);
+    const savedHal = localStorage.getItem(`${tenantPrefix}inv_hal`);
+    const savedTgl = localStorage.getItem(`${tenantPrefix}inv_tanggalAcara`);
+    const savedWaktu = localStorage.getItem(`${tenantPrefix}inv_waktuAcara`);
+    const savedTempat = localStorage.getItem(`${tenantPrefix}inv_tempatAcara`);
     
     if (savedNomor) setNomorSurat(savedNomor);
     if (savedHal) setHal(savedHal);
     if (savedTgl) setTanggalAcara(savedTgl);
     if (savedWaktu) setWaktuAcara(savedWaktu);
     if (savedTempat) setTempatAcara(savedTempat);
-  }, []);
+  }, [user?.tenantId, tenantPrefix]);
 
   // Save to localStorage when values change
-  useEffect(() => { localStorage.setItem('inv_nomorSurat', nomorSurat); }, [nomorSurat]);
-  useEffect(() => { localStorage.setItem('inv_hal', hal); }, [hal]);
-  useEffect(() => { localStorage.setItem('inv_tanggalAcara', tanggalAcara); }, [tanggalAcara]);
-  useEffect(() => { localStorage.setItem('inv_waktuAcara', waktuAcara); }, [waktuAcara]);
-  useEffect(() => { localStorage.setItem('inv_tempatAcara', tempatAcara); }, [tempatAcara]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}inv_nomorSurat`, nomorSurat); }, [nomorSurat, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}inv_hal`, hal); }, [hal, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}inv_tanggalAcara`, tanggalAcara); }, [tanggalAcara, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}inv_waktuAcara`, waktuAcara); }, [waktuAcara, user?.tenantId, tenantPrefix]);
+  useEffect(() => { if (user?.tenantId) localStorage.setItem(`${tenantPrefix}inv_tempatAcara`, tempatAcara); }, [tempatAcara, user?.tenantId, tenantPrefix]);
 
   const handleOpenModal = () => setModalOpen(true);
   const handleCloseModal = () => {
@@ -325,7 +329,7 @@ export default function BatchInvitationDownloader({ className }: BatchInvitation
                               <span className="kop-line-yayasan">YAYASAN BUSTANUL HUDA DAWUHAN</span>
                               <span className="kop-line-sekolah">{batchData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}</span>
                               <span className="kop-line-akreditasi">
-                                TERAKREDITASI A NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}
+                                TERAKREDITASI {batchData.schoolProfile.accreditation || 'A'} NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}
                               </span>
                               <span className="kop-line-alamat">{batchData.schoolProfile.address}</span>
                             </div>

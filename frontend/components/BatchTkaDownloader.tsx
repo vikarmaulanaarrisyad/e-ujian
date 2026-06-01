@@ -146,7 +146,7 @@ export default function BatchTkaDownloader({ className }: BatchTkaDownloaderProp
                             <span className="kop-line-yayasan">YAYASAN BUSTANUL HUDA DAWUHAN</span>
                             <span className="kop-line-sekolah">{batchData.schoolProfile.name || 'MADRASAH IBTIDAIYAH BUSTANUL HUDA 01 DAWUHAN'}</span>
                             <span className="kop-line-akreditasi">
-                              TERAKREDITASI A NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}
+                              TERAKREDITASI {batchData.schoolProfile.accreditation || 'A'} NSM {batchData.schoolProfile.nsm || '111233280040'} NPSN {batchData.schoolProfile.npsn || '60713609'}
                             </span>
                             <span className="kop-line-alamat">{batchData.schoolProfile.address}</span>
                           </div>
