@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import api from '@/lib/api';
 import { Loader2, Mail, X } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
@@ -18,8 +18,30 @@ export default function BatchInvitationDownloader({ className }: BatchInvitation
   const [nomorSurat, setNomorSurat] = useState('');
   const [hal, setHal] = useState('Undangan Pengumuman Kelulusan');
   const [tanggalAcara, setTanggalAcara] = useState('');
-  const [waktuAcara, setWaktuAcara] = useState('');
+  const [waktuAcara, setWaktuAcara] = useState('08.00 WIB - Selesai');
   const [tempatAcara, setTempatAcara] = useState('Halaman Madrasah');
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const savedNomor = localStorage.getItem('inv_nomorSurat');
+    const savedHal = localStorage.getItem('inv_hal');
+    const savedTgl = localStorage.getItem('inv_tanggalAcara');
+    const savedWaktu = localStorage.getItem('inv_waktuAcara');
+    const savedTempat = localStorage.getItem('inv_tempatAcara');
+    
+    if (savedNomor) setNomorSurat(savedNomor);
+    if (savedHal) setHal(savedHal);
+    if (savedTgl) setTanggalAcara(savedTgl);
+    if (savedWaktu) setWaktuAcara(savedWaktu);
+    if (savedTempat) setTempatAcara(savedTempat);
+  }, []);
+
+  // Save to localStorage when values change
+  useEffect(() => { localStorage.setItem('inv_nomorSurat', nomorSurat); }, [nomorSurat]);
+  useEffect(() => { localStorage.setItem('inv_hal', hal); }, [hal]);
+  useEffect(() => { localStorage.setItem('inv_tanggalAcara', tanggalAcara); }, [tanggalAcara]);
+  useEffect(() => { localStorage.setItem('inv_waktuAcara', waktuAcara); }, [waktuAcara]);
+  useEffect(() => { localStorage.setItem('inv_tempatAcara', tempatAcara); }, [tempatAcara]);
 
   const handleOpenModal = () => setModalOpen(true);
   const handleCloseModal = () => {
@@ -42,7 +64,7 @@ export default function BatchInvitationDownloader({ className }: BatchInvitation
       setBatchData(data);
       
       // Give React a moment to render the hidden DOM elements
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       if (!containerRef.current) {
         throw new Error("Container not found");
@@ -89,13 +111,15 @@ export default function BatchInvitationDownloader({ className }: BatchInvitation
         pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
       }
       
-      const fileName = `Undangan_Kelulusan_${data.schoolProfile.name.replace(/\s+/g, '_')}_${new Date().getFullYear()}.pdf`;
+      const schoolName = data?.schoolProfile?.name || 'Madrasah';
+      const fileName = `Undangan_Kelulusan_${schoolName.replace(/\s+/g, '_')}_${new Date().getFullYear()}.pdf`;
       pdf.save(fileName);
       
       setModalOpen(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error generating batch PDF:', err);
-      alert('Terjadi kesalahan saat mengunduh PDF undangan kelulusan.');
+      const msg = err.response?.data?.message || 'Terjadi kesalahan saat mengunduh PDF undangan kelulusan.';
+      alert(msg);
     } finally {
       setDownloading(false);
       setBatchData(null); // Clear data to unmount hidden DOM

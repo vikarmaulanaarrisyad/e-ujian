@@ -31,7 +31,7 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await login(data.username, data.password);
+      await login(data.username.trim(), data.password.trim());
     } catch (err: any) {
       console.error(err);
       setError(
