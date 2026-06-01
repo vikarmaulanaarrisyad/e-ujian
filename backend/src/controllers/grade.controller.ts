@@ -1082,6 +1082,7 @@ export const getGradeRecap = async (req: Request, res: Response, next: NextFunct
 export const exportGradeRecap = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const { sort } = req.query;
     
     const activeYear = await getActiveYear((req as any).user.tenantId);
     if (!activeYear) {
@@ -1177,13 +1178,17 @@ export const exportGradeRecap = async (req: Request, res: Response, next: NextFu
       };
     });
 
-    // Sort in-place by rank ascending, and alphabetically if ranks are equal
-    recapWithRank.sort((a, b) => {
-      if (a.rank !== b.rank) {
-        return a.rank - b.rank;
-      }
-      return a.studentName.localeCompare(b.studentName);
-    });
+    if (sort === 'name' || sort === 'abjad') {
+      recapWithRank.sort((a, b) => a.studentName.localeCompare(b.studentName));
+    } else {
+      // Sort in-place by rank ascending, and alphabetically if ranks are equal
+      recapWithRank.sort((a, b) => {
+        if (a.rank !== b.rank) {
+          return a.rank - b.rank;
+        }
+        return a.studentName.localeCompare(b.studentName);
+      });
+    }
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Rekap Nilai Akhir');

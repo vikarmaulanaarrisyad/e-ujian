@@ -44,7 +44,7 @@ export default function GradeRecapPage() {
 
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const handleDownloadPDF = async () => {
+  const handleDownloadPDF = async (sortByAbjad = false) => {
     if (!data?.recap || data.recap.length === 0) {
       showToast('Tidak ada data untuk diunduh', 'error');
       return;
@@ -126,7 +126,12 @@ export default function GradeRecapPage() {
         'JUMLAH', 'RATA2', 'RATA2 BULAT', 'RANK'
       ];
       
-      const body = data.recap.map((student: StudentRecap) => [
+      const dataToExport = [...data.recap];
+      if (sortByAbjad) {
+        dataToExport.sort((a, b) => a.studentName.localeCompare(b.studentName));
+      }
+
+      const body = dataToExport.map((student: StudentRecap) => [
         student.nis,
         student.studentName,
         student.gender,
@@ -189,9 +194,10 @@ export default function GradeRecapPage() {
     }
   };
 
-  const handleExportExcel = async () => {
+  const handleExportExcel = async (sortByAbjad = false) => {
     try {
-      const response = await api.get('/grades/recap/export', { responseType: 'blob' });
+      const endpoint = sortByAbjad ? '/grades/recap/export?sort=abjad' : '/grades/recap/export';
+      const response = await api.get(endpoint, { responseType: 'blob' });
       const fileName = `rekap_nilai_akhir_${data?.academicYear?.year ? data.academicYear.year.replace('/', '_') : 'recap'}.xlsx`;
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -277,20 +283,37 @@ export default function GradeRecapPage() {
           </button>
 
           <button
-            onClick={handleExportExcel}
+            onClick={() => handleExportExcel(false)}
             className="px-4 py-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 flex items-center gap-2 cursor-pointer transition-all duration-200"
           >
             <Download className="w-4 h-4" />
-            <span>Unduh Excel Rekap</span>
+            <span>Excel (Rank)</span>
           </button>
 
           <button
-            onClick={handleDownloadPDF}
+            onClick={() => handleExportExcel(true)}
+            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 flex items-center gap-2 cursor-pointer transition-all duration-200"
+          >
+            <Download className="w-4 h-4 text-sky-400" />
+            <span>Excel (Abjad)</span>
+          </button>
+
+          <button
+            onClick={() => handleDownloadPDF(false)}
             disabled={isDownloading}
             className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-550 active:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all duration-200 shadow-md shadow-indigo-600/10 disabled:opacity-50"
           >
             {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-            <span>{isDownloading ? 'Memproses PDF...' : 'Unduh PDF'}</span>
+            <span>PDF (Rank)</span>
+          </button>
+
+          <button
+            onClick={() => handleDownloadPDF(true)}
+            disabled={isDownloading}
+            className="px-4 py-2.5 bg-indigo-700 hover:bg-indigo-600 active:bg-indigo-800 text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all duration-200 shadow-md shadow-indigo-700/20 disabled:opacity-50"
+          >
+            {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4 text-sky-300" />}
+            <span>PDF (Abjad)</span>
           </button>
         </div>
       </div>
