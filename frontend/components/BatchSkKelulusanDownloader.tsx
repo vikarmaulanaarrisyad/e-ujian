@@ -108,16 +108,55 @@ export default function BatchSkKelulusanDownloader({ className }: BatchSkKelulus
     });
   };
 
-  // Helper untuk mendapatkan chunk
-  const chunkArray = (array: any[], size: number) => {
-    const chunked = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunked.push(array.slice(i, i + size));
+  // Helper untuk mendapatkan chunk dengan algoritma dinamis
+  const createChunks = (students: any[]) => {
+    if (!students || students.length === 0) return [];
+    
+    const chunks = [];
+    const MAX_ROWS = 40; // Kapasitas baris maksimal untuk A4
+    const HEADER_COST = 6; // Biaya baris untuk attachment-title
+    const FOOTER_COST = 6; // Biaya baris untuk Tanda Tangan
+
+    let currentChunk = [];
+    let currentCost = HEADER_COST; // Halaman pertama lampiran selalu ada header
+
+    for (let i = 0; i < students.length; i++) {
+      let isLastStudent = (i === students.length - 1);
+      let nextCost = currentCost + 1;
+      
+      if (isLastStudent) {
+        if (nextCost + FOOTER_COST <= MAX_ROWS) {
+           currentChunk.push(students[i]);
+           chunks.push(currentChunk);
+           break;
+        } else {
+           chunks.push(currentChunk);
+           chunks.push([students[i]]); 
+           break;
+        }
+      }
+
+      if (nextCost <= MAX_ROWS) {
+        currentChunk.push(students[i]);
+        currentCost = nextCost;
+      } else {
+        chunks.push(currentChunk);
+        currentChunk = [students[i]];
+        currentCost = 1; // Halaman berikutnya tidak ada header
+      }
     }
-    return chunked;
+    return chunks;
   };
 
-  const studentChunks = batchData ? chunkArray(batchData.students, 30) : [];
+  const studentChunks = batchData ? createChunks(batchData.students) : [];
+
+  const getStartIndex = (chunkIndex: number) => {
+    let count = 0;
+    for (let i = 0; i < chunkIndex; i++) {
+      count += studentChunks[i].length;
+    }
+    return count;
+  };
 
   return (
     <>
@@ -420,17 +459,22 @@ export default function BatchSkKelulusanDownloader({ className }: BatchSkKelulus
             </div>
 
             {/* Halaman 2+: Lampiran Daftar Siswa Lulus */}
-            {studentChunks.map((chunk, chunkIndex) => (
+            {studentChunks.map((chunk, chunkIndex) => {
+              const startIndex = getStartIndex(chunkIndex);
+              
+              return (
               <div key={chunkIndex} className="sk-kelulusan-page">
                 <div className="page-inner">
-                  <div className="attachment-title" style={{ textAlign: 'left', lineHeight: '1.4' }}>
-                    LAMPIRAN KEPUTUSAN KEPALA MADRASAH<br/>
-                    NOMOR: {nomorSurat || '........................'}<br/>
-                    TANGGAL: {formatTanggalFormal(tanggalDitetapkan)}<br/>
-                    TENTANG: PENETAPAN KELULUSAN PESERTA DIDIK TAHUN PELAJARAN {batchData.academicYear}
-                  </div>
+                  {chunkIndex === 0 && (
+                    <div className="attachment-title" style={{ textAlign: 'left', lineHeight: '1.4' }}>
+                      LAMPIRAN KEPUTUSAN KEPALA MADRASAH<br/>
+                      NOMOR: {nomorSurat || '........................'}<br/>
+                      TANGGAL: {formatTanggalFormal(tanggalDitetapkan)}<br/>
+                      TENTANG: PENETAPAN KELULUSAN PESERTA DIDIK TAHUN PELAJARAN {batchData.academicYear}
+                    </div>
+                  )}
 
-                  <table className="student-table">
+                  <table className="student-table" style={chunkIndex > 0 ? { marginTop: '20px' } : {}}>
                     <thead>
                       <tr>
                         <th className="col-no">No</th>
@@ -441,7 +485,7 @@ export default function BatchSkKelulusanDownloader({ className }: BatchSkKelulus
                     </thead>
                     <tbody>
                       {chunk.map((student: any, idx: number) => {
-                        const globalIndex = (chunkIndex * 30) + idx + 1;
+                        const globalIndex = startIndex + idx + 1;
                         return (
                           <tr key={student.id}>
                             <td className="col-no">{globalIndex}</td>
@@ -454,22 +498,25 @@ export default function BatchSkKelulusanDownloader({ className }: BatchSkKelulus
                     </tbody>
                   </table>
                   
-                  {/* Tanda tangan Kepala Madrasah di bagian bawah halaman lampiran */}
-                  <div className="signatures-wrap" style={{ marginTop: 'auto', paddingTop: '40px' }}>
-                    <div className="ttd-block">
-                      <p>Kepala Madrasah,</p>
-                      <div className="ttd-space">
-                        {batchData.schoolProfile.signatureUrl && (
-                          <img src={batchData.schoolProfile.signatureUrl} alt="Tanda Tangan" style={{ height: '100%', objectFit: 'contain' }} crossOrigin="anonymous" />
-                        )}
+                  {/* Tanda tangan Kepala Madrasah di bagian bawah halaman lampiran terakhir */}
+                  {chunkIndex === studentChunks.length - 1 && (
+                    <div className="signatures-wrap" style={{ marginTop: '40px' }}>
+                      <div className="ttd-block">
+                        <p>Kepala Madrasah,</p>
+                        <div className="ttd-space">
+                          {batchData.schoolProfile.signatureUrl && (
+                            <img src={batchData.schoolProfile.signatureUrl} alt="Tanda Tangan" style={{ height: '100%', objectFit: 'contain' }} crossOrigin="anonymous" />
+                          )}
+                        </div>
+                        <p className="ttd-name">{batchData.schoolProfile.headmaster}</p>
+                        <p>NIP. {batchData.schoolProfile.headmasterNip || '–'}</p>
                       </div>
-                      <p className="ttd-name">{batchData.schoolProfile.headmaster}</p>
-                      <p>NIP. {batchData.schoolProfile.headmasterNip || '–'}</p>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
-            ))}
+            );
+          })}
 
           </div>
         </div>

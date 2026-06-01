@@ -3,10 +3,20 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Download, FileText, Loader2, BookOpenCheck } from 'lucide-react';
+import { Download, FileText, Loader2, BookOpenCheck, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import {
+  useReactTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  flexRender,
+  ColumnDef,
+  SortingState,
+} from '@tanstack/react-table';
 
 interface StudentSummary {
   studentId: string;
@@ -37,6 +47,84 @@ export default function GradeSummaryPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloadingRankingUM, setIsDownloadingRankingUM] = useState(false);
   const [isDownloadingSummaryUM, setIsDownloadingSummaryUM] = useState(false);
+
+  // Table States
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = useState('');
+
+  const columns = React.useMemo<ColumnDef<StudentSummary>[]>(
+    () => [
+      {
+        id: 'no',
+        header: 'No',
+        cell: (info) => <span className="text-slate-450">{info.row.index + 1}</span>,
+        enableSorting: false,
+      },
+      {
+        accessorKey: 'nis',
+        header: 'NIS',
+        cell: (info) => <span className="font-mono text-slate-450">{info.getValue() as string}</span>,
+      },
+      {
+        accessorKey: 'studentName',
+        header: 'Nama Lengkap',
+        cell: (info) => <span className="font-bold text-slate-205">{info.getValue() as string}</span>,
+      },
+      {
+        accessorKey: 'gender',
+        header: 'L/P',
+        cell: (info) => <div className="text-center w-full">{info.getValue() as string}</div>,
+      },
+      {
+        accessorKey: 'tkaAverage',
+        header: () => <div className="text-center w-full font-bold text-emerald-400">Rata-rata TKA</div>,
+        cell: (info) => (
+          <div className="text-center w-full font-bold font-mono text-emerald-400">
+            {(info.getValue() as number).toFixed(2)}
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'examAverage',
+        header: () => <div className="text-center w-full font-bold text-indigo-400">Rata-rata UM</div>,
+        cell: (info) => (
+          <div className="text-center w-full font-bold font-mono text-indigo-400">
+            {(info.getValue() as number).toFixed(2)}
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'examAverageRounded',
+        header: () => <div className="text-center w-full font-bold text-indigo-400">Rata-rata UM (Bulat)</div>,
+        cell: (info) => (
+          <div className="text-center w-full font-bold font-mono text-indigo-400">
+            {info.getValue() as number}
+          </div>
+        ),
+      },
+    ],
+    []
+  );
+
+  const table = useReactTable({
+    data: data?.summary || [],
+    columns,
+    state: {
+      sorting,
+      globalFilter,
+    },
+    onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
+  });
 
   const handleDownloadPDF = async () => {
     if (!data?.summary || data.summary.length === 0) {
@@ -616,6 +704,19 @@ export default function GradeSummaryPage() {
             <BookOpenCheck className="w-5 h-5 text-indigo-400" />
             <h3 className="font-bold text-slate-200">Tabel Summary Nilai</h3>
           </div>
+          
+          <div className="relative max-w-sm w-full">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-505">
+              <Search className="w-4 h-4" />
+            </div>
+            <input
+              type="text"
+              value={globalFilter ?? ''}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="block w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-colors"
+              placeholder="Cari nama, NIS..."
+            />
+          </div>
         </div>
 
         {isLoading ? (
@@ -628,39 +729,96 @@ export default function GradeSummaryPage() {
             Tidak ada data summary. Pastikan data siswa dan nilai telah diinput.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead>
-                <tr className="border-b border-slate-800/60 text-slate-450 text-[10px] font-bold uppercase tracking-wider">
-                  <th className="py-3 px-4">No</th>
-                  <th className="py-3 px-4">NIS</th>
-                  <th className="py-3 px-4">Nama Lengkap</th>
-                  <th className="py-3 px-4 text-center">L/P</th>
-                  <th className="py-3 px-4 text-center font-bold text-emerald-400">Rata-rata TKA</th>
-                  <th className="py-3 px-4 text-center font-bold text-indigo-400">Rata-rata UM</th>
-                  <th className="py-3 px-4 text-center font-bold text-indigo-400">Rata-rata UM (Bulat)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/40 text-xs text-slate-350">
-                {data.summary.map((student: StudentSummary, index: number) => (
-                  <tr key={student.studentId} className="hover:bg-slate-900/10">
-                    <td className="py-3 px-4 text-slate-450">{index + 1}</td>
-                    <td className="py-3 px-4 font-mono text-slate-450">{student.nis}</td>
-                    <td className="py-3 px-4 font-bold text-slate-205">{student.studentName}</td>
-                    <td className="py-3 px-4 text-center">{student.gender}</td>
-                    <td className="py-3 px-4 text-center font-bold font-mono text-emerald-400">
-                      {student.tkaAverage.toFixed(2)}
-                    </td>
-                    <td className="py-3 px-4 text-center font-bold font-mono text-indigo-400">
-                      {student.examAverage.toFixed(2)}
-                    </td>
-                    <td className="py-3 px-4 text-center font-bold font-mono text-indigo-400">
-                      {student.examAverageRounded}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-4">
+            <div className="overflow-x-auto rounded-xl border border-slate-800/60">
+              <table className="w-full text-left border-collapse min-w-[800px]">
+                <thead>
+                  {table.getHeaderGroups().map(headerGroup => (
+                    <tr key={headerGroup.id} className="bg-slate-900/60 border-b border-slate-800/60 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      {headerGroup.headers.map(header => (
+                        <th key={header.id} className="py-3 px-4">
+                          {header.isPlaceholder ? null : (
+                            <div
+                              className={`flex items-center justify-between gap-1.5 ${
+                                header.column.getCanSort() ? 'cursor-pointer select-none hover:text-slate-200' : ''
+                              }`}
+                              onClick={header.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                              {header.column.getCanSort() && (
+                                <span className="text-slate-500 shrink-0">
+                                  {{
+                                    asc: <ChevronUp className="w-3.5 h-3.5" />,
+                                    desc: <ChevronDown className="w-3.5 h-3.5" />,
+                                  }[header.column.getIsSorted() as string] ?? <ChevronsUpDown className="w-3.5 h-3.5" />}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody className="divide-y divide-slate-800/40 text-xs">
+                  {table.getRowModel().rows.map((row, idx) => (
+                    <tr
+                      key={row.id}
+                      className={`transition-colors hover:bg-slate-900/30 ${idx % 2 === 0 ? '' : 'bg-slate-900/10'}`}
+                    >
+                      {row.getVisibleCells().map(cell => (
+                        <td key={cell.id} className="py-3 px-4">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-slate-800/60 text-xs text-slate-400">
+              <div className="flex items-center gap-2.5">
+                <span>Tampilkan</span>
+                <select
+                  value={table.getState().pagination.pageSize}
+                  onChange={e => table.setPageSize(Number(e.target.value))}
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none"
+                >
+                  {[5, 10, 20, 50].map(pageSize => (
+                    <option key={pageSize} value={pageSize}>
+                      {pageSize}
+                    </option>
+                  ))}
+                </select>
+                <span>baris per halaman</span>
+              </div>
+
+              <div className="flex items-center gap-4.5">
+                <span>
+                  Halaman <strong className="text-slate-205">{table.getState().pagination.pageIndex + 1}</strong> dari{' '}
+                  <strong className="text-slate-205">{table.getPageCount() || 1}</strong>
+                </span>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => table.previousPage()}
+                    disabled={!table.getCanPreviousPage()}
+                    className="px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl hover:bg-slate-850 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  >
+                    Sebelumnya
+                  </button>
+                  <button
+                    onClick={() => table.nextPage()}
+                    disabled={!table.getCanNextPage()}
+                    className="px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl hover:bg-slate-850 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  >
+                    Selanjutnya
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

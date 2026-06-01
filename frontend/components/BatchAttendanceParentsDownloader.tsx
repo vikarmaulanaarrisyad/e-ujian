@@ -19,6 +19,7 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
   const [waktuAcara, setWaktuAcara] = useState('08.00 WIB - Selesai');
   const [tempatAcara, setTempatAcara] = useState('Aula Madrasah');
   const [agenda, setAgenda] = useState('Pengumuman Kelulusan dan Penyerahan SKL');
+  const [paperSize, setPaperSize] = useState<'A4' | 'F4'>('A4');
 
   const handleOpenModal = () => setModalOpen(true);
   const handleCloseModal = () => {
@@ -51,7 +52,7 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: 'a4',
+        format: paperSize === 'F4' ? [215.9, 330.2] : 'a4',
       });
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -110,16 +111,60 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
     });
   };
 
-  // Helper untuk mendapatkan chunk
-  const chunkArray = (array: any[], size: number) => {
-    const chunked = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunked.push(array.slice(i, i + size));
+  // Helper untuk mendapatkan chunk dengan algoritma dinamis
+  const createChunks = (students: any[], paperSize: 'A4' | 'F4') => {
+    if (!students || students.length === 0) return [];
+    
+    const chunks = [];
+    const MAX_ROWS = paperSize === 'F4' ? 42 : 36; // Kapasitas baris maksimal
+    const HEADER_COST = 9; // Biaya baris untuk Kop Surat + Detail Acara
+    const FOOTER_COST = 6; // Biaya baris untuk Tanda Tangan
+
+    let currentChunk = [];
+    let currentCost = HEADER_COST; // Halaman pertama selalu ada header
+
+    for (let i = 0; i < students.length; i++) {
+      let isLastStudent = (i === students.length - 1);
+      let nextCost = currentCost + 1;
+      
+      if (isLastStudent) {
+        // Cek apakah muat ditambah footer di halaman ini
+        if (nextCost + FOOTER_COST <= MAX_ROWS) {
+           currentChunk.push(students[i]);
+           chunks.push(currentChunk);
+           break;
+        } else {
+           // Tidak muat untuk footer, paksa pindah halaman
+           chunks.push(currentChunk);
+           chunks.push([students[i]]); 
+           break;
+        }
+      }
+
+      if (nextCost <= MAX_ROWS) {
+        currentChunk.push(students[i]);
+        currentCost = nextCost;
+      } else {
+        chunks.push(currentChunk);
+        currentChunk = [students[i]];
+        currentCost = 1; // Halaman berikutnya tidak ada header
+      }
     }
-    return chunked;
+    return chunks;
   };
 
-  const studentChunks = batchData ? chunkArray(batchData.students, 25) : []; // 25 students per page
+  const studentChunks = batchData ? createChunks(batchData.students, paperSize) : [];
+
+  const getStartIndex = (chunkIndex: number) => {
+    let count = 0;
+    for (let i = 0; i < chunkIndex; i++) {
+      count += studentChunks[i].length;
+    }
+    return count;
+  };
+
+  const pageWidthMM = paperSize === 'F4' ? 215.9 : 210;
+  const pageHeightMM = paperSize === 'F4' ? 330.2 : 297;
 
   return (
     <>
@@ -198,6 +243,18 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
                     className="w-full px-4 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Ukuran Kertas <span className="text-rose-400">*</span></label>
+                  <select
+                    value={paperSize}
+                    onChange={(e) => setPaperSize(e.target.value as 'A4' | 'F4')}
+                    className="w-full px-4 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer"
+                  >
+                    <option value="A4">A4 (210 x 297 mm)</option>
+                    <option value="F4">F4 / Folio (215.9 x 330.2 mm)</option>
+                  </select>
+                </div>
               </form>
             </div>
 
@@ -231,13 +288,14 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
             <style dangerouslySetInnerHTML={{ __html: `
               .attendance-page {
                 background: white;
-                width: 210mm;
-                min-height: 297mm;
+                width: ${pageWidthMM}mm;
+                min-height: ${pageHeightMM}mm;
                 color: #000;
                 font-family: "Times New Roman", Times, serif;
                 position: relative;
+                box-sizing: border-box;
               }
-              .page-inner { padding: 2cm; min-height: 297mm; display: flex; flex-direction: column; }
+              .page-inner { padding: 2cm; min-height: ${pageHeightMM}mm; display: flex; flex-direction: column; box-sizing: border-box; }
               .kop-surat-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; font-family: "Times New Roman", Times, serif; }
               .kop-surat-table td { vertical-align: middle; padding: 0; }
               .kop-logo-td { width: 105px; text-align: left; }
@@ -258,25 +316,30 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
               
               .event-details-table { margin-bottom: 20px; font-size: 14px; width: 100%; }
               .event-details-table td { padding: 4px 8px; vertical-align: top; }
-              .event-label { font-weight: bold; width: 110px; }
+              .event-label { font-weight: bold; width: 110px; white-space: nowrap; }
               .event-sep { width: 10px; text-align: center; }
               
               .student-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
-              .student-table th, .student-table td { border: 1px solid #000; padding: 6px 8px; }
-              .student-table th { background-color: #f8f9fa; font-weight: bold; text-align: center; }
+              .student-table th, .student-table td { border: 1px solid #000; padding: 6px 8px; vertical-align: middle; }
+              .student-table th { background-color: #f8f9fa; font-weight: bold; text-align: center; padding: 10px 8px; }
               .col-no { width: 40px; text-align: center; }
               
-              .signatures-wrap { margin-top: auto; padding-top: 40px; display: flex; justify-content: flex-end; padding-right: 20px; }
+              .signatures-wrap { margin-top: 40px; display: flex; justify-content: flex-end; padding-right: 20px; }
               .ttd-block { text-align: left; width: 250px; font-size: 15px; line-height: 1.6; position: relative; }
               .ttd-space { height: 80px; display: flex; align-items: center; justify-content: flex-start; position: relative; z-index: 10; margin-left: -10px; }
               .ttd-name { font-weight: bold; text-decoration: underline; letter-spacing: 0.5px; }
             `}} />
             
-            {studentChunks.map((chunk, chunkIndex) => (
-              <div key={chunkIndex} className="attendance-page">
-                <div className="page-inner">
-                  {/* Kop Surat di halaman pertama saja, tapi untuk Daftar Hadir biasanya di setiap halaman biar resmi, atau hanya hal 1. Kita buat tiap halaman. */}
-                  <table className="kop-surat-table">
+            {studentChunks.map((chunk, chunkIndex) => {
+              const startIndex = getStartIndex(chunkIndex);
+              
+              return (
+                <div key={chunkIndex} className="attendance-page">
+                  <div className="page-inner">
+                    {/* Kop Surat & Detail Acara hanya di halaman pertama */}
+                    {chunkIndex === 0 && (
+                      <>
+                        <table className="kop-surat-table">
                     <tbody>
                       <tr>
                         <td className="kop-logo-td">
@@ -313,7 +376,7 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
                       <tr>
                         <td className="event-label">Agenda</td>
                         <td className="event-sep">:</td>
-                        <td style={{ width: '50%' }}>{agenda}</td>
+                        <td>{agenda}</td>
                         <td className="event-label">Hari/Tanggal</td>
                         <td className="event-sep">:</td>
                         <td>{formatTanggalFormal(tanggalAcara)}</td>
@@ -328,10 +391,12 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
                       </tr>
                     </tbody>
                   </table>
+                  </>
+                )}
 
-                  <table className="student-table">
-                    <thead>
-                      <tr>
+                <table className="student-table" style={chunkIndex > 0 ? { marginTop: '20px' } : {}}>
+                  <thead>
+                    <tr>
                         <th className="col-no">No</th>
                         <th style={{ width: '100px', textAlign: 'center' }}>NISN</th>
                         <th style={{ textAlign: 'left' }}>Nama Siswa</th>
@@ -341,18 +406,18 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
                     </thead>
                     <tbody>
                       {chunk.map((student: any, idx: number) => {
-                        const globalIndex = (chunkIndex * 25) + idx + 1;
+                        const globalIndex = startIndex + idx + 1;
                         const isEven = globalIndex % 2 === 0;
                         return (
                           <tr key={student.id}>
                             <td className="col-no">{globalIndex}</td>
-                            <td style={{ textAlign: 'center' }}>{student.nisn || '-'}</td>
-                            <td style={{ textTransform: 'uppercase' }}>{student.name}</td>
-                            <td>{student.parentName || '................................'}</td>
-                            <td style={{ width: '90px', height: '40px', borderRight: 'none', verticalAlign: 'top', paddingTop: '6px' }}>
+                            <td style={{ textAlign: 'center', fontWeight: '500' }}>{student.nisn || '-'}</td>
+                            <td style={{ textTransform: 'uppercase', fontWeight: 'bold' }}>{student.name}</td>
+                            <td>................................................</td>
+                            <td style={{ width: '80px', height: '36px', borderRight: 'none', verticalAlign: 'top', paddingTop: '8px' }}>
                               {!isEven && <span>{globalIndex}. ....................</span>}
                             </td>
-                            <td style={{ width: '90px', height: '40px', borderLeft: 'none', verticalAlign: 'bottom', paddingBottom: '6px' }}>
+                            <td style={{ width: '80px', height: '36px', borderLeft: 'none', verticalAlign: 'bottom', paddingBottom: '8px' }}>
                               {isEven && <span>{globalIndex}. ....................</span>}
                             </td>
                           </tr>
@@ -379,7 +444,8 @@ export default function BatchAttendanceParentsDownloader({ className }: BatchAtt
                   )}
                 </div>
               </div>
-            ))}
+            );
+          })}
 
           </div>
         </div>
