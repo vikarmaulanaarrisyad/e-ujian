@@ -310,12 +310,15 @@ const parseFlexibleDate = (val: any): Date | null => {
   if (val === null || val === undefined || val === '') return null;
   
   if (val instanceof Date) {
-    return isNaN(val.getTime()) ? null : val;
+    if (isNaN(val.getTime())) return null;
+    // Force to UTC midnight based on local date values to prevent timezone shifts
+    return new Date(Date.UTC(val.getFullYear(), val.getMonth(), val.getDate()));
   }
   
   if (typeof val === 'number') {
-    // Excel serial date epoch begins Dec 30, 1899. There are 86400 seconds in a day.
-    const date = new Date((val - 25569) * 86400 * 1000);
+    // Excel serial date epoch begins Dec 30, 1899.
+    const date = new Date(Date.UTC(1899, 11, 30));
+    date.setUTCDate(date.getUTCDate() + Math.floor(val));
     return isNaN(date.getTime()) ? null : date;
   }
   
@@ -333,22 +336,35 @@ const parseFlexibleDate = (val: any): Date | null => {
     const str = val.trim();
     if (!str) return null;
     
-    // Test standard parsing (e.g. YYYY-MM-DD or standard Date-parseable string)
-    let parsed = new Date(str);
-    if (!isNaN(parsed.getTime())) {
-      return parsed;
-    }
-    
     // Parse DD/MM/YYYY or DD-MM-YYYY (allowing optional trailing time/spaces)
     const dmyMatch = str.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})/);
     if (dmyMatch) {
       const day = parseInt(dmyMatch[1], 10);
       const month = parseInt(dmyMatch[2], 10) - 1; // Month is 0-indexed in JS
       const year = parseInt(dmyMatch[3], 10);
-      parsed = new Date(year, month, day);
+      const parsed = new Date(Date.UTC(year, month, day));
       if (!isNaN(parsed.getTime())) {
         return parsed;
       }
+    }
+
+    // Parse YYYY-MM-DD
+    const ymdMatch = str.match(/^(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})/);
+    if (ymdMatch) {
+      const year = parseInt(ymdMatch[1], 10);
+      const month = parseInt(ymdMatch[2], 10) - 1;
+      const day = parseInt(ymdMatch[3], 10);
+      const parsed = new Date(Date.UTC(year, month, day));
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+    
+    // Test standard parsing (e.g. YYYY-MM-DD or standard Date-parseable string)
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) {
+      // Force to UTC midnight
+      return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
     }
   }
   
@@ -380,7 +396,14 @@ export const importStudents = async (req: Request, res: Response, next: NextFunc
       let nis = getCellValueAsString(row.getCell(1));
       let nisn = getCellValueAsString(row.getCell(2));
       const name = getCellValueAsString(row.getCell(3));
-      const genderRaw = getCellValueAsString(row.getCell(4)).toUpperCase();
+      let genderRaw = getCellValueAsString(row.getCell(4)).toUpperCase();
+      
+      if (genderRaw === 'LAKI-LAKI' || genderRaw === 'LAKI - LAKI' || genderRaw === 'LAKILAKI') {
+        genderRaw = 'L';
+      } else if (genderRaw === 'PEREMPUAN') {
+        genderRaw = 'P';
+      }
+      
       const placeOfBirth = getCellValueAsString(row.getCell(5));
       const dateCell = row.getCell(6);
       const parentName = getCellValueAsString(row.getCell(7));
@@ -434,16 +457,18 @@ export const importStudents = async (req: Request, res: Response, next: NextFunc
     await prisma.$transaction(async (tx) => {
       for (const student of studentsToInsert) {
         const existingNis = await tx.student.findFirst({ where: { nis: student.nis, tenantId } });
-        if (existingNis) {
-          throw new Error(`NIS '${student.nis}' is already registered in the system.`);
-        }
-
         const existingNisn = await tx.student.findFirst({ where: { nisn: student.nisn, tenantId } });
-        if (existingNisn) {
-          throw new Error(`NISN '${student.nisn}' is already registered in the system.`);
-        }
 
-        await (tx.student.create as any)({ data: { ...student, tenantId } });
+        const targetId = existingNis ? existingNis.id : (existingNisn ? existingNisn.id : null);
+
+        if (targetId) {
+          await (tx.student.update as any)({
+            where: { id: targetId },
+            data: { ...student, tenantId }
+          });
+        } else {
+          await (tx.student.create as any)({ data: { ...student, tenantId } });
+        }
         successCount++;
       }
     }).catch((err) => {
@@ -453,7 +478,7 @@ export const importStudents = async (req: Request, res: Response, next: NextFunc
     fs.unlinkSync(req.file.path);
 
     if (dbErrors.length > 0) {
-      return res.status(400).json({ message: 'Import failed due to duplicate database entries', errors: dbErrors });
+      return res.status(400).json({ message: 'Terjadi kesalahan saat menyimpan ke database', errors: dbErrors });
     }
 
     logActivity({ req, action: 'IMPORT_STUDENTS', entity: 'Student', description: `Mengimpor ${successCount} data siswa dari Excel` });
