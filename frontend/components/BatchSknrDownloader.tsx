@@ -299,7 +299,7 @@ export default function BatchSknrDownloader({ className }: BatchSknrDownloaderPr
               
               .closing-text { font-size: 13px; text-align: justify; margin-bottom: 40px; }
 
-              .footer-wrap { display: flex; justify-content: flex-end; gap: 40px; margin-top: auto; padding-top: 20px; }
+              .footer-wrap { display: flex; justify-content: flex-end; gap: 60px; margin-top: auto; padding-top: 20px; }
               .photo-box { width: 3cm; height: 4cm; border: 1px solid black; display: flex; align-items: center; justify-content: center; font-size: 11px; text-align: center; }
               .photo-img { width: 3cm; height: 4cm; object-fit: cover; border: 1px solid black; }
               .ttd-box { width: 250px; text-align: left; font-size: 13px; }
