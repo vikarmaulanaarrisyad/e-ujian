@@ -49,6 +49,7 @@ import BatchSknrDownloader from '@/components/BatchSknrDownloader';
 import BatchSkKelulusanDownloader from '@/components/BatchSkKelulusanDownloader';
 import BatchBeritaAcaraDownloader from '@/components/BatchBeritaAcaraDownloader';
 import BatchAttendanceParentsDownloader from '@/components/BatchAttendanceParentsDownloader';
+import BatchLaporanKilatDownloader from '@/components/BatchLaporanKilatDownloader';
 
 interface Student {
   id: string;
@@ -459,6 +460,7 @@ export default function GraduationPage() {
               </button>
 
               {/* Batch Print SKL (Direct Download) */}
+              <BatchLaporanKilatDownloader />
               <BatchSknrDownloader />
               <BatchSkKelulusanDownloader />
               <BatchBeritaAcaraDownloader />
