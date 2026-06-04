@@ -14,6 +14,7 @@ export default function BatchSknrDownloader({ className }: BatchSknrDownloaderPr
   const tenantPrefix = user?.tenantId ? `${user.tenantId}_` : '';
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedSemesters, setSelectedSemesters] = useState<number[]>([7, 8, 9, 10, 11]);
+  const [useFormat7Mapel, setUseFormat7Mapel] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [batchData, setBatchData] = useState<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -49,7 +50,7 @@ export default function BatchSknrDownloader({ className }: BatchSknrDownloaderPr
       setDownloading(true);
       
       const semestersQuery = selectedSemesters.join(',');
-      const res = await api.get(`/documents/sknr-batch?semesters=${semestersQuery}`);
+      const res = await api.get(`/documents/sknr-batch?semesters=${semestersQuery}${useFormat7Mapel ? '&format=7mapel' : ''}`);
       const data = res.data;
       setBatchData(data);
       
@@ -167,7 +168,7 @@ export default function BatchSknrDownloader({ className }: BatchSknrDownloaderPr
                 </button>
               </div>
               
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
                 {availableSemesters.map(sem => {
                   const isSelected = selectedSemesters.includes(sem);
                   return (
@@ -198,6 +199,25 @@ export default function BatchSknrDownloader({ className }: BatchSknrDownloaderPr
                     </label>
                   );
                 })}
+              </div>
+
+              <div className="mb-8">
+                <label className="flex items-center gap-3 p-3 cursor-pointer rounded-2xl border-2 transition-all duration-300 bg-slate-950/50 border-slate-800 hover:border-slate-600 group">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 text-emerald-500 bg-slate-900 border-slate-700 rounded focus:ring-emerald-500 focus:ring-offset-slate-900"
+                    checked={useFormat7Mapel}
+                    onChange={(e) => setUseFormat7Mapel(e.target.checked)}
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-slate-300 group-hover:text-white transition-colors">
+                      Gunakan Format 7 Mapel Utama
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      (Agama, Pancasila, B. Indonesia, MTK, IPAS, PJOK, Seni Budaya)
+                    </span>
+                  </div>
+                </label>
               </div>
 
               <div className="flex gap-3">

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getBatchTkaStatementData = exports.getStudentSknrData = exports.getAllGraduatedSklData = exports.getStudentDocumentData = void 0;
+exports.getAllGraduatedSknrData = exports.getBatchTkaStatementData = exports.getStudentSknrData = exports.getAllGraduatedSklData = exports.getStudentDocumentData = void 0;
 const db_1 = __importDefault(require("../db"));
 // Helper: build a default school profile object
 const defaultProfile = () => ({
@@ -15,16 +15,21 @@ const defaultProfile = () => ({
     headmasterNip: '19700101 200003 1 001',
     city: null,
     logoUrl: null,
+    signatureUrl: null,
     sklNumberFormat: null,
+    accreditation: 'A',
     createdAt: new Date(),
     updatedAt: new Date(),
 });
-// Helper: make logoUrl absolute
-const resolveLogoUrl = (profile, req) => {
+// Helper: make logoUrl and signatureUrl absolute
+const resolveUrls = (profile, req) => {
+    const host = req.get('host');
+    const protocol = req.protocol;
     if (profile.logoUrl && !profile.logoUrl.startsWith('http')) {
-        const host = req.get('host');
-        const protocol = req.protocol;
         profile.logoUrl = `${protocol}://${host}${profile.logoUrl}`;
+    }
+    if (profile.signatureUrl && !profile.signatureUrl.startsWith('http')) {
+        profile.signatureUrl = `${protocol}://${host}${profile.signatureUrl}`;
     }
     return profile;
 };
@@ -45,7 +50,7 @@ const getStudentDocumentData = async (req, res, next) => {
         const eWeight = weight.examPercentage / 100.0;
         // Fetch school profile
         let profile = await db_1.default.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
-        profile = resolveLogoUrl({ ...profile }, req);
+        profile = resolveUrls({ ...profile }, req);
         // Fetch student with all their grades
         const student = await db_1.default.student.findUnique({
             where: { id },
@@ -158,7 +163,7 @@ const getAllGraduatedSklData = async (req, res, next) => {
         }
         // Fetch school profile
         let profile = await db_1.default.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
-        profile = resolveLogoUrl({ ...profile }, req);
+        profile = resolveUrls({ ...profile }, req);
         // Fetch all graduated students ordered by sklNumber then name
         const students = await db_1.default.student.findMany({
             where: { isGraduated: true, tenantId },
@@ -223,7 +228,7 @@ exports.getAllGraduatedSklData = getAllGraduatedSklData;
 const getStudentSknrData = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { semesters } = req.query;
+        const { semesters, format } = req.query;
         const tenantId = req.user.tenantId;
         let activeSemesters = [7, 8, 9, 10, 11];
         if (typeof semesters === 'string' && semesters.trim() !== '') {
@@ -237,7 +242,7 @@ const getStudentSknrData = async (req, res, next) => {
             return res.status(404).json({ message: 'Tidak ada tahun ajaran aktif.' });
         }
         let profile = await db_1.default.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
-        profile = resolveLogoUrl({ ...profile }, req);
+        profile = resolveUrls({ ...profile }, req);
         const student = await db_1.default.student.findUnique({
             where: { id },
             include: {
@@ -249,61 +254,7 @@ const getStudentSknrData = async (req, res, next) => {
         if (!student) {
             return res.status(404).json({ message: 'Siswa tidak ditemukan.' });
         }
-        const validReportGrades = student.reportGrades.filter(rg => activeSemesters.includes(rg.semester));
-        const subjectsMap = new Map();
-        validReportGrades.forEach(rg => {
-            const lowerName = rg.subject.name.toLowerCase();
-            const isAgama = lowerName.includes('quran') || lowerName.includes('qur\'an') || lowerName.includes('qur`an') || lowerName.includes('hadis') || lowerName.includes('hadits') ||
-                lowerName.includes('akidah') || lowerName.includes('aqidah') ||
-                lowerName.includes('fikih') || lowerName.includes('fiqih') ||
-                lowerName.includes('sejarah kebudayaan islam') || lowerName === 'ski';
-            const mapKey = isAgama ? 'agama_group' : rg.subject.id;
-            const mapName = isAgama ? 'Pendidikan Agama dan Budi Pekerti' : rg.subject.name;
-            const mapOrder = isAgama ? -1 : (rg.subject.order || 0); // -1 to force it to top
-            if (!subjectsMap.has(mapKey)) {
-                subjectsMap.set(mapKey, {
-                    subjectId: mapKey,
-                    subjectName: mapName,
-                    order: mapOrder,
-                    semesterScores: {},
-                });
-            }
-            const subj = subjectsMap.get(mapKey);
-            if (!subj.semesterScores[rg.semester]) {
-                subj.semesterScores[rg.semester] = { sum: 0, count: 0 };
-            }
-            subj.semesterScores[rg.semester].sum += rg.score;
-            subj.semesterScores[rg.semester].count += 1;
-        });
-        const subjectList = Array.from(subjectsMap.values()).map(subj => {
-            const finalScores = {};
-            let totalSum = 0;
-            let totalCount = 0;
-            for (const semStr of Object.keys(subj.semesterScores)) {
-                const sem = parseInt(semStr, 10);
-                const { sum, count } = subj.semesterScores[sem];
-                const avg = count > 0 ? (sum / count) : 0;
-                finalScores[sem] = avg;
-                totalSum += avg;
-                totalCount += 1;
-            }
-            return {
-                subjectName: subj.subjectName,
-                scores: finalScores,
-                average: totalCount > 0 ? (totalSum / totalCount) : 0,
-                order: subj.order
-            };
-        });
-        subjectList.sort((a, b) => {
-            if (a.order !== b.order)
-                return a.order - b.order;
-            return a.subjectName.localeCompare(b.subjectName);
-        });
-        let totalAverage = 0;
-        if (subjectList.length > 0) {
-            const sumAllAverages = subjectList.reduce((acc, curr) => acc + curr.average, 0);
-            totalAverage = sumAllAverages / subjectList.length;
-        }
+        const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters, typeof format === 'string' ? format : undefined);
         return res.status(200).json({
             student: {
                 id: student.id,
@@ -324,8 +275,8 @@ const getStudentSknrData = async (req, res, next) => {
             schoolProfile: profile,
             sknrDetails: {
                 activeSemesters,
-                subjects: subjectList,
-                totalAverage: Number(totalAverage.toFixed(2)),
+                subjects,
+                totalAverage,
             },
             academicYear: activeYear.year,
         });
@@ -346,7 +297,7 @@ const getBatchTkaStatementData = async (req, res, next) => {
             return res.status(404).json({ message: 'Tidak ada tahun ajaran aktif.' });
         }
         let profile = await db_1.default.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
-        profile = resolveLogoUrl({ ...profile }, req);
+        profile = resolveUrls({ ...profile }, req);
         const students = await db_1.default.student.findMany({
             where: { tenantId, isGraduated: true },
             include: {
@@ -389,3 +340,176 @@ const getBatchTkaStatementData = async (req, res, next) => {
     }
 };
 exports.getBatchTkaStatementData = getBatchTkaStatementData;
+// Helper function to process SKNR grades
+const processSknrGrades = (reportGrades, activeSemesters, format) => {
+    const validReportGrades = reportGrades.filter(rg => activeSemesters.includes(rg.semester));
+    const subjectsMap = new Map();
+    validReportGrades.forEach(rg => {
+        const lowerName = rg.subject.name.toLowerCase();
+        const isAgama = lowerName.includes('quran') || lowerName.includes('qur\'an') || lowerName.includes('qur`an') || lowerName.includes('hadis') || lowerName.includes('hadits') ||
+            lowerName.includes('akidah') || lowerName.includes('aqidah') ||
+            lowerName.includes('fikih') || lowerName.includes('fiqih') ||
+            lowerName.includes('sejarah kebudayaan islam') || lowerName === 'ski' ||
+            lowerName.includes('agama');
+        let mapKey = isAgama ? 'agama_group' : rg.subject.id;
+        let mapName = isAgama ? 'Pendidikan Agama dan Budi Pekerti' : rg.subject.name;
+        let mapOrder = isAgama ? -1 : (rg.subject.order || 0); // -1 to force it to top
+        if (format === '7mapel') {
+            let matched = false;
+            if (isAgama) {
+                mapName = 'Pendidikan Agama dan Budi Pekerti';
+                mapKey = '7m_agama';
+                mapOrder = 1;
+                matched = true;
+            }
+            else if (lowerName.includes('pancasila') || lowerName.includes('ppkn') || lowerName.includes('kewarganegaraan')) {
+                mapName = 'Pendidikan Pancasila';
+                mapKey = '7m_pancasila';
+                mapOrder = 2;
+                matched = true;
+            }
+            else if (lowerName.includes('indonesia')) {
+                mapName = 'Bahasa Indonesia';
+                mapKey = '7m_indonesia';
+                mapOrder = 3;
+                matched = true;
+            }
+            else if (lowerName.includes('matematika')) {
+                mapName = 'Matematika';
+                mapKey = '7m_mtk';
+                mapOrder = 4;
+                matched = true;
+            }
+            else if (lowerName.includes('ilmu pengetahuan alam') || lowerName.includes('ipas') || lowerName === 'ipa' || lowerName.includes('ipa ') || lowerName === 'ips' || lowerName.includes('ips ') || lowerName.includes('sosial')) {
+                mapName = 'Ilmu Pengetahuan Alam dan Sosial';
+                mapKey = '7m_ipas';
+                mapOrder = 5;
+                matched = true;
+            }
+            else if (lowerName.includes('jasmani') || lowerName.includes('olahraga') || lowerName.includes('pjok') || lowerName.includes('penjas')) {
+                mapName = 'Pendidikan Jasmani, Olahraga dan Kesehatan';
+                mapKey = '7m_pjok';
+                mapOrder = 6;
+                matched = true;
+            }
+            else if (lowerName.includes('seni') || lowerName.includes('sbdp') || lowerName.includes('prakarya')) {
+                mapName = 'Seni dan Budaya';
+                mapKey = '7m_seni';
+                mapOrder = 7;
+                matched = true;
+            }
+            if (!matched)
+                return;
+        }
+        if (!subjectsMap.has(mapKey)) {
+            subjectsMap.set(mapKey, {
+                subjectId: mapKey,
+                subjectName: mapName,
+                order: mapOrder,
+                semesterScores: {},
+            });
+        }
+        const subj = subjectsMap.get(mapKey);
+        if (!subj.semesterScores[rg.semester]) {
+            subj.semesterScores[rg.semester] = { sum: 0, count: 0 };
+        }
+        subj.semesterScores[rg.semester].sum += rg.score;
+        subj.semesterScores[rg.semester].count += 1;
+    });
+    const subjectList = Array.from(subjectsMap.values()).map(subj => {
+        const finalScores = {};
+        let totalSum = 0;
+        let totalCount = 0;
+        for (const semStr of Object.keys(subj.semesterScores)) {
+            const sem = parseInt(semStr, 10);
+            const { sum, count } = subj.semesterScores[sem];
+            const avg = count > 0 ? (sum / count) : 0;
+            finalScores[sem] = avg;
+            totalSum += avg;
+            totalCount += 1;
+        }
+        return {
+            subjectName: subj.subjectName,
+            scores: finalScores,
+            average: totalCount > 0 ? (totalSum / totalCount) : 0,
+            order: subj.order
+        };
+    });
+    subjectList.sort((a, b) => {
+        if (a.order !== b.order)
+            return a.order - b.order;
+        return a.subjectName.localeCompare(b.subjectName);
+    });
+    let totalAverage = 0;
+    if (subjectList.length > 0) {
+        const sumAllAverages = subjectList.reduce((acc, curr) => acc + curr.average, 0);
+        totalAverage = sumAllAverages / subjectList.length;
+    }
+    return {
+        subjects: subjectList,
+        totalAverage: Number(totalAverage.toFixed(2)),
+    };
+};
+const getAllGraduatedSknrData = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const { semesters, format } = req.query;
+        let activeSemesters = [7, 8, 9, 10, 11];
+        if (typeof semesters === 'string' && semesters.trim() !== '') {
+            activeSemesters = semesters.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+        }
+        const activeYear = await db_1.default.academicYear.findFirst({
+            where: { isActive: true, tenantId },
+            include: { gradeWeights: true },
+        });
+        if (!activeYear) {
+            return res.status(404).json({ message: 'Tidak ada tahun ajaran aktif.' });
+        }
+        let profile = await db_1.default.schoolProfile.findUnique({ where: { tenantId }, include: { tenant: true } }) || defaultProfile();
+        profile = resolveUrls({ ...profile }, req);
+        const students = await db_1.default.student.findMany({
+            where: { isGraduated: true, tenantId },
+            include: {
+                reportGrades: {
+                    include: { subject: true },
+                },
+            },
+            orderBy: [{ sklNumber: 'asc' }, { name: 'asc' }],
+        });
+        if (students.length === 0) {
+            return res.status(404).json({ message: 'Tidak ada siswa yang berstatus lulus.' });
+        }
+        return res.status(200).json({
+            students: students.map((student) => {
+                const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters, typeof format === 'string' ? format : undefined);
+                return {
+                    id: student.id,
+                    nis: student.nis,
+                    nisn: student.nisn,
+                    name: student.name,
+                    gender: student.gender,
+                    placeOfBirth: student.placeOfBirth,
+                    dateOfBirth: student.dateOfBirth,
+                    parentName: student.parentName,
+                    isGraduated: student.isGraduated,
+                    graduationDate: student.graduationDate,
+                    certificateNumber: student.certificateNumber,
+                    sklNumber: student.sklNumber,
+                    sknrNumber: student.sknrNumber,
+                    photoUrl: student.photoUrl,
+                    sknrDetails: {
+                        activeSemesters,
+                        subjects,
+                        totalAverage,
+                    }
+                };
+            }),
+            schoolProfile: profile,
+            academicYear: activeYear.year,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.getAllGraduatedSknrData = getAllGraduatedSknrData;

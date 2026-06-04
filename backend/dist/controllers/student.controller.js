@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.archiveStudents = exports.uploadPhotos = exports.batchAssignSknrNumbers = exports.batchAssignSklNumbers = exports.batchUpdateGraduation = exports.updateGraduationStatus = exports.importStudents = exports.exportStudents = exports.getStudentTemplate = exports.deleteStudent = exports.updateStudent = exports.createStudent = exports.getStudentById = exports.getAllStudents = void 0;
+exports.exportGraduationData = exports.archiveStudents = exports.batchDeletePhotos = exports.deleteStudentPhoto = exports.uploadPhotos = exports.batchAssignSknrNumbers = exports.batchAssignSklNumbers = exports.batchUpdateGraduation = exports.updateGraduationStatus = exports.importStudents = exports.exportStudents = exports.getStudentTemplate = exports.deleteStudent = exports.updateStudent = exports.createStudent = exports.getStudentById = exports.getAllStudents = void 0;
 const exceljs_1 = __importDefault(require("exceljs"));
 const db_1 = __importDefault(require("../db"));
 const student_validator_1 = require("../validators/student.validator");
@@ -276,11 +276,15 @@ const parseFlexibleDate = (val) => {
     if (val === null || val === undefined || val === '')
         return null;
     if (val instanceof Date) {
-        return isNaN(val.getTime()) ? null : val;
+        if (isNaN(val.getTime()))
+            return null;
+        // Force to UTC midnight based on local date values to prevent timezone shifts
+        return new Date(Date.UTC(val.getFullYear(), val.getMonth(), val.getDate()));
     }
     if (typeof val === 'number') {
-        // Excel serial date epoch begins Dec 30, 1899. There are 86400 seconds in a day.
-        const date = new Date((val - 25569) * 86400 * 1000);
+        // Excel serial date epoch begins Dec 30, 1899.
+        const date = new Date(Date.UTC(1899, 11, 30));
+        date.setUTCDate(date.getUTCDate() + Math.floor(val));
         return isNaN(date.getTime()) ? null : date;
     }
     if (typeof val === 'object') {
@@ -296,21 +300,33 @@ const parseFlexibleDate = (val) => {
         const str = val.trim();
         if (!str)
             return null;
-        // Test standard parsing (e.g. YYYY-MM-DD or standard Date-parseable string)
-        let parsed = new Date(str);
-        if (!isNaN(parsed.getTime())) {
-            return parsed;
-        }
         // Parse DD/MM/YYYY or DD-MM-YYYY (allowing optional trailing time/spaces)
         const dmyMatch = str.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})/);
         if (dmyMatch) {
             const day = parseInt(dmyMatch[1], 10);
             const month = parseInt(dmyMatch[2], 10) - 1; // Month is 0-indexed in JS
             const year = parseInt(dmyMatch[3], 10);
-            parsed = new Date(year, month, day);
+            const parsed = new Date(Date.UTC(year, month, day));
             if (!isNaN(parsed.getTime())) {
                 return parsed;
             }
+        }
+        // Parse YYYY-MM-DD
+        const ymdMatch = str.match(/^(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})/);
+        if (ymdMatch) {
+            const year = parseInt(ymdMatch[1], 10);
+            const month = parseInt(ymdMatch[2], 10) - 1;
+            const day = parseInt(ymdMatch[3], 10);
+            const parsed = new Date(Date.UTC(year, month, day));
+            if (!isNaN(parsed.getTime())) {
+                return parsed;
+            }
+        }
+        // Test standard parsing (e.g. YYYY-MM-DD or standard Date-parseable string)
+        const parsed = new Date(str);
+        if (!isNaN(parsed.getTime())) {
+            // Force to UTC midnight
+            return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
         }
     }
     return null;
@@ -336,7 +352,13 @@ const importStudents = async (req, res, next) => {
             let nis = getCellValueAsString(row.getCell(1));
             let nisn = getCellValueAsString(row.getCell(2));
             const name = getCellValueAsString(row.getCell(3));
-            const genderRaw = getCellValueAsString(row.getCell(4)).toUpperCase();
+            let genderRaw = getCellValueAsString(row.getCell(4)).toUpperCase();
+            if (genderRaw === 'LAKI-LAKI' || genderRaw === 'LAKI - LAKI' || genderRaw === 'LAKILAKI') {
+                genderRaw = 'L';
+            }
+            else if (genderRaw === 'PEREMPUAN') {
+                genderRaw = 'P';
+            }
             const placeOfBirth = getCellValueAsString(row.getCell(5));
             const dateCell = row.getCell(6);
             const parentName = getCellValueAsString(row.getCell(7));
@@ -385,14 +407,17 @@ const importStudents = async (req, res, next) => {
         await db_1.default.$transaction(async (tx) => {
             for (const student of studentsToInsert) {
                 const existingNis = await tx.student.findFirst({ where: { nis: student.nis, tenantId } });
-                if (existingNis) {
-                    throw new Error(`NIS '${student.nis}' is already registered in the system.`);
-                }
                 const existingNisn = await tx.student.findFirst({ where: { nisn: student.nisn, tenantId } });
-                if (existingNisn) {
-                    throw new Error(`NISN '${student.nisn}' is already registered in the system.`);
+                const targetId = existingNis ? existingNis.id : (existingNisn ? existingNisn.id : null);
+                if (targetId) {
+                    await tx.student.update({
+                        where: { id: targetId },
+                        data: { ...student, tenantId }
+                    });
                 }
-                await tx.student.create({ data: { ...student, tenantId } });
+                else {
+                    await tx.student.create({ data: { ...student, tenantId } });
+                }
                 successCount++;
             }
         }).catch((err) => {
@@ -400,7 +425,7 @@ const importStudents = async (req, res, next) => {
         });
         fs_1.default.unlinkSync(req.file.path);
         if (dbErrors.length > 0) {
-            return res.status(400).json({ message: 'Import failed due to duplicate database entries', errors: dbErrors });
+            return res.status(400).json({ message: 'Terjadi kesalahan saat menyimpan ke database', errors: dbErrors });
         }
         (0, activityLog_1.logActivity)({ req, action: 'IMPORT_STUDENTS', entity: 'Student', description: `Mengimpor ${successCount} data siswa dari Excel` });
         return res.status(200).json({
@@ -678,6 +703,74 @@ const uploadPhotos = async (req, res, next) => {
     }
 };
 exports.uploadPhotos = uploadPhotos;
+// Delete student photo
+const deleteStudentPhoto = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const { id } = req.params;
+        const student = await db_1.default.student.findUnique({ where: { id, tenantId } });
+        if (!student) {
+            return res.status(404).json({ message: 'Student not found' });
+        }
+        if (student.photoUrl) {
+            const fileName = path_1.default.basename(student.photoUrl);
+            const filePath = path_1.default.join(process.cwd(), 'uploads', 'photos', fileName);
+            if (fs_1.default.existsSync(filePath)) {
+                fs_1.default.unlinkSync(filePath);
+            }
+            await db_1.default.student.update({
+                where: { id },
+                data: { photoUrl: null },
+            });
+            (0, activityLog_1.logActivity)({ req, action: 'DELETE_STUDENT_PHOTO', entity: 'Student', entityId: id, description: `Menghapus foto siswa: ${student.name} (NIS: ${student.nis})` });
+        }
+        return res.status(200).json({ message: 'Foto siswa berhasil dihapus' });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.deleteStudentPhoto = deleteStudentPhoto;
+// Batch delete student photos
+const batchDeletePhotos = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const { studentIds, all } = req.body;
+        const whereClause = { tenantId };
+        if (!all) {
+            if (!Array.isArray(studentIds) || studentIds.length === 0) {
+                return res.status(400).json({ message: 'Daftar ID siswa tidak valid.' });
+            }
+            whereClause.id = { in: studentIds };
+        }
+        // Get students with photos to delete the physical files
+        const studentsWithPhotos = await db_1.default.student.findMany({
+            where: { ...whereClause, photoUrl: { not: null } }
+        });
+        let count = 0;
+        for (const student of studentsWithPhotos) {
+            if (student.photoUrl) {
+                const fileName = path_1.default.basename(student.photoUrl);
+                const filePath = path_1.default.join(process.cwd(), 'uploads', 'photos', fileName);
+                if (fs_1.default.existsSync(filePath)) {
+                    fs_1.default.unlinkSync(filePath);
+                }
+                count++;
+            }
+        }
+        // Update DB
+        await db_1.default.student.updateMany({
+            where: whereClause,
+            data: { photoUrl: null }
+        });
+        (0, activityLog_1.logActivity)({ req, action: 'BATCH_DELETE_PHOTOS', entity: 'Student', description: `Menghapus ${count} foto siswa secara massal.` });
+        return res.status(200).json({ message: `Berhasil menghapus ${count} foto siswa.` });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.batchDeletePhotos = batchDeletePhotos;
 // Archive graduated students to Alumni
 const archiveStudents = async (req, res, next) => {
     try {
@@ -718,3 +811,38 @@ const archiveStudents = async (req, res, next) => {
     }
 };
 exports.archiveStudents = archiveStudents;
+// Export graduation data (Name, NISN, SKL, SKNR)
+const exportGraduationData = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const students = await db_1.default.student.findMany({
+            where: { tenantId, isGraduated: true },
+            orderBy: { name: 'asc' },
+        });
+        const workbook = new exceljs_1.default.Workbook();
+        const worksheet = workbook.addWorksheet('Data Kelulusan');
+        worksheet.columns = [
+            { header: 'Nama Siswa', key: 'name', width: 30 },
+            { header: 'NISN', key: 'nisn', width: 20 },
+            { header: 'Nomor SKL', key: 'sklNumber', width: 25 },
+            { header: 'Nomor SKNR', key: 'sknrNumber', width: 25 },
+        ];
+        worksheet.getRow(1).font = { bold: true };
+        students.forEach((student) => {
+            worksheet.addRow({
+                name: student.name,
+                nisn: student.nisn,
+                sklNumber: student.sklNumber || '-',
+                sknrNumber: student.sknrNumber || '-',
+            });
+        });
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="data_kelulusan.xlsx"');
+        await workbook.xlsx.write(res);
+        res.end();
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.exportGraduationData = exportGraduationData;

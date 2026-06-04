@@ -13,6 +13,8 @@ const DEFAULT_SCHOOL = {
     headmaster: 'H. Fulan, S.Pd.I',
     headmasterNip: '19700101 200003 1 001',
     city: null,
+    signatureUrl: null,
+    accreditation: 'A',
 };
 const getSchoolProfile = async (req, res, next) => {
     try {
@@ -25,10 +27,13 @@ const getSchoolProfile = async (req, res, next) => {
         }
         // Ensure the logo URL is absolute so frontend can display it easily
         let responseProfile = { ...profile };
+        const host = req.get('host');
+        const protocol = req.protocol;
         if (responseProfile.logoUrl && !responseProfile.logoUrl.startsWith('http')) {
-            const host = req.get('host');
-            const protocol = req.protocol;
             responseProfile.logoUrl = `${protocol}://${host}${responseProfile.logoUrl}`;
+        }
+        if (responseProfile.signatureUrl && !responseProfile.signatureUrl.startsWith('http')) {
+            responseProfile.signatureUrl = `${protocol}://${host}${responseProfile.signatureUrl}`;
         }
         return res.status(200).json(responseProfile);
     }
@@ -39,12 +44,23 @@ const getSchoolProfile = async (req, res, next) => {
 exports.getSchoolProfile = getSchoolProfile;
 const updateSchoolProfile = async (req, res, next) => {
     try {
-        const { name, foundationName, npsn, nsm, address, district, province, headmaster, headmasterNip, city, sklNumberFormat, sknrNumberFormat } = req.body;
+        const { name, foundationName, npsn, nsm, address, district, province, headmaster, headmasterNip, city, sklNumberFormat, sknrNumberFormat, accreditation } = req.body;
         let profile = await db_1.default.schoolProfile.findFirst();
         let logoUrl = profile?.logoUrl;
-        // If a new file is uploaded
-        if (req.file) {
-            logoUrl = `/uploads/${req.file.filename}`;
+        let signatureUrl = profile?.signatureUrl;
+        // If new files are uploaded
+        const files = req.files;
+        if (files?.logo && files.logo.length > 0) {
+            logoUrl = `/uploads/${files.logo[0].filename}`;
+        }
+        else if (req.body.deleteLogo === 'true') {
+            logoUrl = null;
+        }
+        if (files?.signature && files.signature.length > 0) {
+            signatureUrl = `/uploads/${files.signature[0].filename}`;
+        }
+        else if (req.body.deleteSignature === 'true') {
+            signatureUrl = null;
         }
         if (profile) {
             profile = await db_1.default.schoolProfile.update({
@@ -61,8 +77,10 @@ const updateSchoolProfile = async (req, res, next) => {
                     headmaster: headmaster || profile.headmaster,
                     headmasterNip: headmasterNip || profile.headmasterNip,
                     logoUrl,
+                    signatureUrl,
                     sklNumberFormat: sklNumberFormat !== undefined ? (sklNumberFormat || null) : profile.sklNumberFormat,
                     sknrNumberFormat: sknrNumberFormat !== undefined ? (sknrNumberFormat || null) : profile.sknrNumberFormat,
+                    accreditation: accreditation !== undefined ? (accreditation || 'A') : profile.accreditation,
                 },
             });
         }
@@ -80,8 +98,10 @@ const updateSchoolProfile = async (req, res, next) => {
                     headmaster: headmaster || DEFAULT_SCHOOL.headmaster,
                     headmasterNip: headmasterNip || DEFAULT_SCHOOL.headmasterNip,
                     logoUrl,
+                    signatureUrl,
                     sklNumberFormat: sklNumberFormat || null,
                     sknrNumberFormat: sknrNumberFormat || null,
+                    accreditation: accreditation || 'A',
                 },
             });
         }
@@ -90,10 +110,13 @@ const updateSchoolProfile = async (req, res, next) => {
         }
         (0, activityLog_1.logActivity)({ req, action: 'UPDATE_SCHOOL_PROFILE', entity: 'SchoolProfile', entityId: profile.id, description: `Memperbarui profil madrasah: ${profile.name}` });
         let responseProfile = { ...profile };
+        const host = req.get('host');
+        const protocol = req.protocol;
         if (responseProfile.logoUrl && !responseProfile.logoUrl.startsWith('http')) {
-            const host = req.get('host');
-            const protocol = req.protocol;
             responseProfile.logoUrl = `${protocol}://${host}${responseProfile.logoUrl}`;
+        }
+        if (responseProfile.signatureUrl && !responseProfile.signatureUrl.startsWith('http')) {
+            responseProfile.signatureUrl = `${protocol}://${host}${responseProfile.signatureUrl}`;
         }
         return res.status(200).json({
             message: 'Profil Madrasah berhasil diperbarui.',

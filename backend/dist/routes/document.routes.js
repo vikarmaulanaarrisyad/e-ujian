@@ -12,5 +12,6 @@ router.use(auth_middleware_1.authenticateJWT);
 router.get('/student/:id', (0, rbac_middleware_1.requireRoles)(enums_1.Role.ADMIN, enums_1.Role.STAFF), document_controller_1.getStudentDocumentData);
 router.get('/student/:id/sknr', (0, rbac_middleware_1.requireRoles)(enums_1.Role.ADMIN, enums_1.Role.STAFF), document_controller_1.getStudentSknrData);
 router.get('/skl-batch', (0, rbac_middleware_1.requireRoles)(enums_1.Role.ADMIN, enums_1.Role.STAFF), document_controller_1.getAllGraduatedSklData);
+router.get('/sknr-batch', (0, rbac_middleware_1.requireRoles)(enums_1.Role.ADMIN, enums_1.Role.STAFF), document_controller_1.getAllGraduatedSknrData);
 router.get('/tka-batch', (0, rbac_middleware_1.requireRoles)(enums_1.Role.ADMIN, enums_1.Role.STAFF, enums_1.Role.GURU), document_controller_1.getBatchTkaStatementData);
 exports.default = router;

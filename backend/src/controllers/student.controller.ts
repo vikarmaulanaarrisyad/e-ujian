@@ -808,6 +808,83 @@ export const uploadPhotos = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
+// Delete student photo
+export const deleteStudentPhoto = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    const { id } = req.params;
+
+    const student = await prisma.student.findUnique({ where: { id, tenantId } });
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    if (student.photoUrl) {
+      const fileName = path.basename(student.photoUrl);
+      const filePath = path.join(process.cwd(), 'uploads', 'photos', fileName);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+
+      await (prisma.student.update as any)({
+        where: { id },
+        data: { photoUrl: null },
+      });
+
+      logActivity({ req, action: 'DELETE_STUDENT_PHOTO', entity: 'Student', entityId: id, description: `Menghapus foto siswa: ${student.name} (NIS: ${student.nis})` });
+    }
+
+    return res.status(200).json({ message: 'Foto siswa berhasil dihapus' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Batch delete student photos
+export const batchDeletePhotos = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    const { studentIds, all } = req.body;
+
+    const whereClause: any = { tenantId };
+    if (!all) {
+      if (!Array.isArray(studentIds) || studentIds.length === 0) {
+        return res.status(400).json({ message: 'Daftar ID siswa tidak valid.' });
+      }
+      whereClause.id = { in: studentIds };
+    }
+
+    // Get students with photos to delete the physical files
+    const studentsWithPhotos = await prisma.student.findMany({
+      where: { ...whereClause, photoUrl: { not: null } }
+    });
+
+    let count = 0;
+    for (const student of studentsWithPhotos) {
+      if (student.photoUrl) {
+        const fileName = path.basename(student.photoUrl);
+        const filePath = path.join(process.cwd(), 'uploads', 'photos', fileName);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+        count++;
+      }
+    }
+
+    // Update DB
+    await (prisma.student.updateMany as any)({
+      where: whereClause,
+      data: { photoUrl: null }
+    });
+
+    logActivity({ req, action: 'BATCH_DELETE_PHOTOS', entity: 'Student', description: `Menghapus ${count} foto siswa secara massal.` });
+
+    return res.status(200).json({ message: `Berhasil menghapus ${count} foto siswa.` });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Archive graduated students to Alumni
 export const archiveStudents = async (req: Request, res: Response, next: NextFunction) => {
   try {

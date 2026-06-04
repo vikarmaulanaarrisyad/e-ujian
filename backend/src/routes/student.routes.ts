@@ -13,6 +13,8 @@ import {
   batchAssignSklNumbers,
   batchAssignSknrNumbers,
   uploadPhotos,
+  deleteStudentPhoto,
+  batchDeletePhotos,
   archiveStudents,
   exportGraduationData,
 } from '../controllers/student.controller';
@@ -31,6 +33,7 @@ router.get('/template', requireRoles(Role.ADMIN, Role.STAFF), getStudentTemplate
 router.get('/export', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), exportStudents);
 router.post('/import', requireRoles(Role.ADMIN, Role.STAFF), upload.single('file'), importStudents);
 router.post('/upload-photos', requireRoles(Role.ADMIN, Role.STAFF), uploadZip.single('file'), uploadPhotos);
+router.post('/delete-photos/batch', requireRoles(Role.ADMIN, Role.STAFF), batchDeletePhotos);
 router.post('/archive', requireRoles(Role.ADMIN), archiveStudents);
 
 // Standard CRUD routes
@@ -38,6 +41,7 @@ router.get('/', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getAllStudents)
 router.get('/:id', requireRoles(Role.ADMIN, Role.GURU, Role.STAFF), getStudentById);
 router.post('/', requireRoles(Role.ADMIN, Role.STAFF), createStudent);
 router.put('/:id', requireRoles(Role.ADMIN, Role.STAFF), updateStudent);
+router.delete('/:id/photo', requireRoles(Role.ADMIN, Role.STAFF), deleteStudentPhoto);
 router.delete('/:id', requireRoles(Role.ADMIN), deleteStudent);
 
 // Graduation routes

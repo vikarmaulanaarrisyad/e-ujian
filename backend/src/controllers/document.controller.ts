@@ -250,7 +250,7 @@ export const getAllGraduatedSklData = async (req: Request, res: Response, next: 
 export const getStudentSknrData = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { semesters } = req.query;
+    const { semesters, format } = req.query;
     const tenantId = (req as any).user.tenantId;
 
     let activeSemesters = [7, 8, 9, 10, 11];
@@ -283,7 +283,7 @@ export const getStudentSknrData = async (req: Request, res: Response, next: Next
       return res.status(404).json({ message: 'Siswa tidak ditemukan.' });
     }
 
-    const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters);
+    const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters, typeof format === 'string' ? format : undefined);
 
     return res.status(200).json({
       student: {
@@ -376,7 +376,7 @@ export const getBatchTkaStatementData = async (req: Request, res: Response, next
 };
 
 // Helper function to process SKNR grades
-const processSknrGrades = (reportGrades: any[], activeSemesters: number[]) => {
+const processSknrGrades = (reportGrades: any[], activeSemesters: number[], format?: string) => {
   const validReportGrades = reportGrades.filter(rg => activeSemesters.includes(rg.semester));
   const subjectsMap = new Map<string, any>();
   
@@ -386,11 +386,54 @@ const processSknrGrades = (reportGrades: any[], activeSemesters: number[]) => {
       lowerName.includes('quran') || lowerName.includes('qur\'an') || lowerName.includes('qur`an') || lowerName.includes('hadis') || lowerName.includes('hadits') ||
       lowerName.includes('akidah') || lowerName.includes('aqidah') ||
       lowerName.includes('fikih') || lowerName.includes('fiqih') ||
-      lowerName.includes('sejarah kebudayaan islam') || lowerName === 'ski';
+      lowerName.includes('sejarah kebudayaan islam') || lowerName === 'ski' ||
+      lowerName.includes('agama');
 
-    const mapKey = isAgama ? 'agama_group' : rg.subject.id;
-    const mapName = isAgama ? 'Pendidikan Agama dan Budi Pekerti' : rg.subject.name;
-    const mapOrder = isAgama ? -1 : (rg.subject.order || 0); // -1 to force it to top
+    let mapKey = isAgama ? 'agama_group' : rg.subject.id;
+    let mapName = isAgama ? 'Pendidikan Agama dan Budi Pekerti' : rg.subject.name;
+    let mapOrder = isAgama ? -1 : (rg.subject.order || 0); // -1 to force it to top
+
+    if (format === '7mapel') {
+      let matched = false;
+      if (isAgama) {
+        mapName = 'Pendidikan Agama dan Budi Pekerti';
+        mapKey = '7m_agama';
+        mapOrder = 1;
+        matched = true;
+      } else if (lowerName.includes('pancasila') || lowerName.includes('ppkn') || lowerName.includes('kewarganegaraan')) {
+        mapName = 'Pendidikan Pancasila';
+        mapKey = '7m_pancasila';
+        mapOrder = 2;
+        matched = true;
+      } else if (lowerName.includes('indonesia')) {
+        mapName = 'Bahasa Indonesia';
+        mapKey = '7m_indonesia';
+        mapOrder = 3;
+        matched = true;
+      } else if (lowerName.includes('matematika')) {
+        mapName = 'Matematika';
+        mapKey = '7m_mtk';
+        mapOrder = 4;
+        matched = true;
+      } else if (lowerName.includes('ilmu pengetahuan alam') || lowerName.includes('ipas') || lowerName === 'ipa' || lowerName.includes('ipa ') || lowerName === 'ips' || lowerName.includes('ips ') || lowerName.includes('sosial')) {
+        mapName = 'Ilmu Pengetahuan Alam dan Sosial';
+        mapKey = '7m_ipas';
+        mapOrder = 5;
+        matched = true;
+      } else if (lowerName.includes('jasmani') || lowerName.includes('olahraga') || lowerName.includes('pjok') || lowerName.includes('penjas')) {
+        mapName = 'Pendidikan Jasmani, Olahraga dan Kesehatan';
+        mapKey = '7m_pjok';
+        mapOrder = 6;
+        matched = true;
+      } else if (lowerName.includes('seni') || lowerName.includes('sbdp') || lowerName.includes('prakarya')) {
+        mapName = 'Seni dan Budaya';
+        mapKey = '7m_seni';
+        mapOrder = 7;
+        matched = true;
+      }
+      
+      if (!matched) return;
+    }
 
     if (!subjectsMap.has(mapKey)) {
       subjectsMap.set(mapKey, {
@@ -450,7 +493,7 @@ const processSknrGrades = (reportGrades: any[], activeSemesters: number[]) => {
 export const getAllGraduatedSknrData = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = (req as any).user.tenantId;
-    const { semesters } = req.query;
+    const { semesters, format } = req.query;
 
     let activeSemesters = [7, 8, 9, 10, 11];
     if (typeof semesters === 'string' && semesters.trim() !== '') {
@@ -485,7 +528,7 @@ export const getAllGraduatedSknrData = async (req: Request, res: Response, next:
 
     return res.status(200).json({
       students: students.map((student) => {
-        const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters);
+        const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters, typeof format === 'string' ? format : undefined);
         return {
           id: student.id,
           nis: student.nis,

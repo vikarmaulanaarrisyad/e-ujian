@@ -41,6 +41,7 @@ interface Student {
   placeOfBirth?: string;
   dateOfBirth?: string;
   parentName?: string;
+  photoUrl?: string;
 }
 
 export default function StudentsPage() {
@@ -68,10 +69,12 @@ export default function StudentsPage() {
   const [placeOfBirth, setPlaceOfBirth] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [parentName, setParentName] = useState('');
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   // Table States
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
+  const [rowSelection, setRowSelection] = useState({});
 
   // Fetch Students
   const { data: students = [], isLoading } = useQuery<Student[]>({
@@ -87,6 +90,26 @@ export default function StudentsPage() {
   // Define Columns
   const columns = useMemo<ColumnDef<Student>[]>(
     () => [
+      {
+        id: 'select',
+        header: ({ table }) => (
+          <input
+            type="checkbox"
+            checked={table.getIsAllPageRowsSelected()}
+            onChange={table.getToggleAllPageRowsSelectedHandler()}
+            className="w-4 h-4 text-indigo-500 bg-slate-900 border-slate-700 rounded focus:ring-indigo-500 focus:ring-offset-slate-900"
+          />
+        ),
+        cell: ({ row }) => (
+          <input
+            type="checkbox"
+            checked={row.getIsSelected()}
+            onChange={row.getToggleSelectedHandler()}
+            className="w-4 h-4 text-indigo-500 bg-slate-900 border-slate-700 rounded focus:ring-indigo-500 focus:ring-offset-slate-900"
+          />
+        ),
+        enableSorting: false,
+      },
       {
         accessorKey: 'nis',
         header: 'NIS',
@@ -168,7 +191,10 @@ export default function StudentsPage() {
     state: {
       sorting,
       globalFilter,
+      rowSelection,
     },
+    enableRowSelection: true,
+    onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
@@ -234,6 +260,36 @@ export default function StudentsPage() {
     }
   });
 
+  // Delete Student Photo Mutation
+  const deletePhotoMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await api.delete(`/students/${id}/photo`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      setPhotoUrl(null);
+      showToast('Foto siswa berhasil dihapus.', 'success');
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || 'Gagal menghapus foto siswa.', 'error');
+    }
+  });
+
+  // Batch Delete Photos Mutation
+  const batchDeletePhotosMutation = useMutation({
+    mutationFn: async ({ studentIds, all }: { studentIds: string[], all: boolean }) => {
+      return await api.post('/students/delete-photos/batch', { studentIds, all });
+    },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      setRowSelection({});
+      showToast(res.data.message || 'Foto siswa berhasil dihapus.', 'success');
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || 'Gagal menghapus foto secara massal.', 'error');
+    }
+  });
+
   const openAddModal = () => {
     setEditMode(false);
     setSelectedStudentId(null);
@@ -245,6 +301,7 @@ export default function StudentsPage() {
     setPlaceOfBirth('');
     setDateOfBirth('');
     setParentName('');
+    setPhotoUrl(null);
     setFormError({});
     setGeneralError(null);
     setModalOpen(true);
@@ -261,6 +318,7 @@ export default function StudentsPage() {
     setPlaceOfBirth(student.placeOfBirth || '');
     setDateOfBirth(student.dateOfBirth ? student.dateOfBirth.substring(0, 10) : '');
     setParentName(student.parentName || '');
+    setPhotoUrl(student.photoUrl || null);
     setFormError({});
     setGeneralError(null);
     setModalOpen(true);
@@ -297,6 +355,19 @@ export default function StudentsPage() {
     if (confirm(`Apakah Anda yakin ingin menghapus data siswa ${studentName}?`)) {
       deleteMutation.mutate(id);
     }
+  };
+
+  const handleBatchDeletePhotos = () => {
+    const selectedIds = Object.keys(rowSelection).map(idx => students[parseInt(idx)]?.id).filter(Boolean);
+    const isAll = selectedIds.length === 0;
+
+    if (isAll) {
+      if (!confirm('Apakah Anda yakin ingin menghapus SEMUA foto siswa secara massal? Tindakan ini tidak dapat dibatalkan.')) return;
+    } else {
+      if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.length} foto siswa terpilih?`)) return;
+    }
+
+    batchDeletePhotosMutation.mutate({ studentIds: selectedIds, all: isAll });
   };
 
   // Excel Downloads
@@ -442,6 +513,19 @@ export default function StudentsPage() {
               >
                 <ImagePlus className="w-4 h-4 text-pink-400" />
                 <span>{uploadingZip ? 'Mengunggah...' : 'Upload Foto (ZIP)'}</span>
+              </button>
+
+              <button
+                onClick={handleBatchDeletePhotos}
+                disabled={batchDeletePhotosMutation.isPending}
+                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-xl text-xs font-semibold text-rose-400 flex items-center gap-2 cursor-pointer transition-all duration-200 disabled:opacity-50"
+              >
+                {batchDeletePhotosMutation.isPending ? (
+                  <div className="w-4 h-4 border-2 border-rose-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                <span>{Object.keys(rowSelection).length > 0 ? `Hapus Foto Terpilih (${Object.keys(rowSelection).length})` : 'Hapus Semua Foto'}</span>
               </button>
 
               <button
@@ -634,6 +718,38 @@ export default function StudentsPage() {
                 />
                 {formError.name && <p className="text-[10px] text-rose-400 mt-1">{formError.name[0]}</p>}
               </div>
+
+              {editMode && photoUrl && (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider mb-2">Foto Siswa</label>
+                  <div className="flex items-center gap-4 p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                    <img 
+                      src={photoUrl.startsWith('http') ? photoUrl : `http://localhost:5000${photoUrl}`} 
+                      alt="Foto Siswa" 
+                      className="w-16 h-16 object-cover rounded-lg border border-slate-700" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm('Apakah Anda yakin ingin menghapus foto siswa ini?')) {
+                          if (selectedStudentId) {
+                            deletePhotoMutation.mutate(selectedStudentId);
+                          }
+                        }
+                      }}
+                      disabled={deletePhotoMutation.isPending}
+                      className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      {deletePhotoMutation.isPending ? (
+                        <div className="w-3.5 h-3.5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                      <span>Hapus Foto</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
