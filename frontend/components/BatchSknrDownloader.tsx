@@ -15,6 +15,7 @@ export default function BatchSknrDownloader({ className }: BatchSknrDownloaderPr
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedSemesters, setSelectedSemesters] = useState<number[]>([7, 8, 9, 10, 11]);
   const [useFormat7Mapel, setUseFormat7Mapel] = useState(false);
+  const [gabungArab, setGabungArab] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [batchData, setBatchData] = useState<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,7 +51,7 @@ export default function BatchSknrDownloader({ className }: BatchSknrDownloaderPr
       setDownloading(true);
       
       const semestersQuery = selectedSemesters.join(',');
-      const res = await api.get(`/documents/sknr-batch?semesters=${semestersQuery}${useFormat7Mapel ? '&format=7mapel' : ''}`);
+      const res = await api.get(`/documents/sknr-batch?semesters=${semestersQuery}${useFormat7Mapel ? '&format=7mapel' : ''}${gabungArab ? '&gabungArab=true' : ''}`);
       const data = res.data;
       setBatchData(data);
       
@@ -215,6 +216,25 @@ export default function BatchSknrDownloader({ className }: BatchSknrDownloaderPr
                     </span>
                     <span className="text-xs text-slate-500">
                       (Agama, Pancasila, B. Indonesia, MTK, IPAS, PJOK, Seni Budaya)
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="mb-8">
+                <label className="flex items-center gap-3 p-3 cursor-pointer rounded-2xl border-2 transition-all duration-300 bg-slate-950/50 border-slate-800 hover:border-slate-600 group">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 text-emerald-500 bg-slate-900 border-slate-700 rounded focus:ring-emerald-500 focus:ring-offset-slate-900"
+                    checked={gabungArab}
+                    onChange={(e) => setGabungArab(e.target.checked)}
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-slate-300 group-hover:text-white transition-colors">
+                      Gabung Bahasa Arab
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      (Digabungkan ke dalam Pendidikan Agama dan Budi Pekerti)
                     </span>
                   </div>
                 </label>

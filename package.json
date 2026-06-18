@@ -1,0 +1,10 @@
+{
+  "name": "e-ujian-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npx concurrently \"npm run start --prefix backend\" \"npm run start --prefix frontend\"",
+    "dev": "npx concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "build": "npm run build --prefix backend && npm run build --prefix frontend"
+  }
+}

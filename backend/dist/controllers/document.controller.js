@@ -228,7 +228,7 @@ exports.getAllGraduatedSklData = getAllGraduatedSklData;
 const getStudentSknrData = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { semesters, format } = req.query;
+        const { semesters, format, gabungArab } = req.query;
         const tenantId = req.user.tenantId;
         let activeSemesters = [7, 8, 9, 10, 11];
         if (typeof semesters === 'string' && semesters.trim() !== '') {
@@ -254,7 +254,7 @@ const getStudentSknrData = async (req, res, next) => {
         if (!student) {
             return res.status(404).json({ message: 'Siswa tidak ditemukan.' });
         }
-        const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters, typeof format === 'string' ? format : undefined);
+        const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters, typeof format === 'string' ? format : undefined, gabungArab === 'true');
         return res.status(200).json({
             student: {
                 id: student.id,
@@ -341,7 +341,7 @@ const getBatchTkaStatementData = async (req, res, next) => {
 };
 exports.getBatchTkaStatementData = getBatchTkaStatementData;
 // Helper function to process SKNR grades
-const processSknrGrades = (reportGrades, activeSemesters, format) => {
+const processSknrGrades = (reportGrades, activeSemesters, format, gabungArab = false) => {
     const validReportGrades = reportGrades.filter(rg => activeSemesters.includes(rg.semester));
     const subjectsMap = new Map();
     validReportGrades.forEach(rg => {
@@ -350,7 +350,8 @@ const processSknrGrades = (reportGrades, activeSemesters, format) => {
             lowerName.includes('akidah') || lowerName.includes('aqidah') ||
             lowerName.includes('fikih') || lowerName.includes('fiqih') ||
             lowerName.includes('sejarah kebudayaan islam') || lowerName === 'ski' ||
-            lowerName.includes('agama');
+            lowerName.includes('agama') ||
+            (gabungArab && lowerName.includes('arab'));
         let mapKey = isAgama ? 'agama_group' : rg.subject.id;
         let mapName = isAgama ? 'Pendidikan Agama dan Budi Pekerti' : rg.subject.name;
         let mapOrder = isAgama ? -1 : (rg.subject.order || 0); // -1 to force it to top
@@ -453,7 +454,7 @@ const processSknrGrades = (reportGrades, activeSemesters, format) => {
 const getAllGraduatedSknrData = async (req, res, next) => {
     try {
         const tenantId = req.user.tenantId;
-        const { semesters, format } = req.query;
+        const { semesters, format, gabungArab } = req.query;
         let activeSemesters = [7, 8, 9, 10, 11];
         if (typeof semesters === 'string' && semesters.trim() !== '') {
             activeSemesters = semesters.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
@@ -481,7 +482,7 @@ const getAllGraduatedSknrData = async (req, res, next) => {
         }
         return res.status(200).json({
             students: students.map((student) => {
-                const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters, typeof format === 'string' ? format : undefined);
+                const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters, typeof format === 'string' ? format : undefined, gabungArab === 'true');
                 return {
                     id: student.id,
                     nis: student.nis,

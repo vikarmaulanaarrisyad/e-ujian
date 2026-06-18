@@ -42,6 +42,7 @@ import {
 } from '@tanstack/react-table';
 import BatchSklDownloader from '@/components/BatchSklDownloader';
 import BatchInvitationDownloader from '@/components/BatchInvitationDownloader';
+import BatchHaflahInvitationDownloader from '@/components/BatchHaflahInvitationDownloader';
 import IndividualSklDownloader from '@/components/IndividualSklDownloader';
 import IndividualSknrDownloader from '@/components/IndividualSknrDownloader';
 import IndividualIjazahDownloader from '@/components/IndividualIjazahDownloader';
@@ -466,6 +467,7 @@ export default function GraduationPage() {
               <BatchBeritaAcaraDownloader />
               <BatchAttendanceParentsDownloader />
               <BatchInvitationDownloader />
+              <BatchHaflahInvitationDownloader />
               <BatchSklDownloader />
               <BatchSklDownloader withTranscript={true} />
 

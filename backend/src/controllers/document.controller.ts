@@ -250,7 +250,7 @@ export const getAllGraduatedSklData = async (req: Request, res: Response, next: 
 export const getStudentSknrData = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { semesters, format } = req.query;
+    const { semesters, format, gabungArab } = req.query;
     const tenantId = (req as any).user.tenantId;
 
     let activeSemesters = [7, 8, 9, 10, 11];
@@ -283,7 +283,7 @@ export const getStudentSknrData = async (req: Request, res: Response, next: Next
       return res.status(404).json({ message: 'Siswa tidak ditemukan.' });
     }
 
-    const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters, typeof format === 'string' ? format : undefined);
+    const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters, typeof format === 'string' ? format : undefined, gabungArab === 'true');
 
     return res.status(200).json({
       student: {
@@ -376,7 +376,7 @@ export const getBatchTkaStatementData = async (req: Request, res: Response, next
 };
 
 // Helper function to process SKNR grades
-const processSknrGrades = (reportGrades: any[], activeSemesters: number[], format?: string) => {
+const processSknrGrades = (reportGrades: any[], activeSemesters: number[], format?: string, gabungArab: boolean = false) => {
   const validReportGrades = reportGrades.filter(rg => activeSemesters.includes(rg.semester));
   const subjectsMap = new Map<string, any>();
   
@@ -387,7 +387,8 @@ const processSknrGrades = (reportGrades: any[], activeSemesters: number[], forma
       lowerName.includes('akidah') || lowerName.includes('aqidah') ||
       lowerName.includes('fikih') || lowerName.includes('fiqih') ||
       lowerName.includes('sejarah kebudayaan islam') || lowerName === 'ski' ||
-      lowerName.includes('agama');
+      lowerName.includes('agama') ||
+      (gabungArab && lowerName.includes('arab'));
 
     let mapKey = isAgama ? 'agama_group' : rg.subject.id;
     let mapName = isAgama ? 'Pendidikan Agama dan Budi Pekerti' : rg.subject.name;
@@ -493,7 +494,7 @@ const processSknrGrades = (reportGrades: any[], activeSemesters: number[], forma
 export const getAllGraduatedSknrData = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = (req as any).user.tenantId;
-    const { semesters, format } = req.query;
+    const { semesters, format, gabungArab } = req.query;
 
     let activeSemesters = [7, 8, 9, 10, 11];
     if (typeof semesters === 'string' && semesters.trim() !== '') {
@@ -528,7 +529,7 @@ export const getAllGraduatedSknrData = async (req: Request, res: Response, next:
 
     return res.status(200).json({
       students: students.map((student) => {
-        const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters, typeof format === 'string' ? format : undefined);
+        const { subjects, totalAverage } = processSknrGrades(student.reportGrades, activeSemesters, typeof format === 'string' ? format : undefined, gabungArab === 'true');
         return {
           id: student.id,
           nis: student.nis,
